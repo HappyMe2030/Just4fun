@@ -100,12 +100,12 @@ LOGIN_PAGE = """
   .card { background: white; padding: 2.5rem; border-radius: 8px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
   a.btn { display: inline-block; margin-top: 1rem; padding: 0.6rem 1.2rem;
-          background: #4285F4; color: white; text-decoration: none;
+          background: #333; color: white; text-decoration: none;
           border-radius: 4px; font-size: 1rem; }
 </style>
 <div class="card">
   <h2>Welcome</h2>
-  <a class="btn" href="/login">Sign in with Google</a>
+  <a class="btn" href="/login">Log in / Sign up</a>
 </div>
 """
 
