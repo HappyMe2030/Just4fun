@@ -30,6 +30,21 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         with conn.cursor() as cur:
+            # An earlier, pre-Auth0 version of this app created a "people"
+            # table with a different schema (no auth0_sub/email columns).
+            # If that old shape is still there, drop it so we can recreate
+            # it with the columns this version needs.
+            cur.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'people' AND column_name = 'auth0_sub'
+                """
+            )
+            has_new_schema = cur.fetchone() is not None
+            if not has_new_schema:
+                cur.execute("DROP TABLE IF EXISTS logins")
+                cur.execute("DROP TABLE IF EXISTS people")
+
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS people (
