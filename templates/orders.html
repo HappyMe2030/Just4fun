@@ -17,6 +17,12 @@
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='cancelled') }}">
         <button type="submit" class="secondary">Cancel request</button>
       </form>
+    {% elif o.status == 'completed' %}
+      {% if o.review_id %}
+        <p class="muted">You rated this printer {{ o.review_rating }}/5. <a href="{{ url_for('review_order', order_id=o.id) }}">Edit review</a></p>
+      {% else %}
+        <a class="btn" href="{{ url_for('review_order', order_id=o.id) }}">Leave a review</a>
+      {% endif %}
     {% endif %}
   </div>
 {% else %}

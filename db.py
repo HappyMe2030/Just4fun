@@ -127,6 +127,37 @@ def init_db():
                 )
                 """
             )
+
+            # tracks, per person per order, when they last read the chat
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chat_reads (
+                    order_id INTEGER NOT NULL REFERENCES orders(id),
+                    person_id INTEGER NOT NULL REFERENCES people(id),
+                    last_read_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    PRIMARY KEY (order_id, person_id)
+                )
+                """
+            )
+
+            # web push subscriptions, one row per browser/device a person
+            # has granted notification permission on
+            cur.execute("DROP TABLE IF EXISTS push_subscriptions")
+
+            # --- reviews: requester rates the printer after order completion ---
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reviews (
+                    id SERIAL PRIMARY KEY,
+                    order_id INTEGER UNIQUE NOT NULL REFERENCES orders(id),
+                    printer_id INTEGER NOT NULL REFERENCES printers(id),
+                    requester_id INTEGER NOT NULL REFERENCES people(id),
+                    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                    comment TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
         conn.commit()
 
 

@@ -11,7 +11,10 @@
     {% if user %}
       <a href="{{ url_for('list_projects') }}">Projects</a>
       <a href="{{ url_for('list_printers') }}">Printers</a>
-      <a href="{{ url_for('list_orders') }}">Orders</a>
+      <a href="{{ url_for('list_orders') }}">Orders
+        <span id="unread-badge" style="background:#e53935; color:white; border-radius:10px;
+              padding:0 6px; font-size:0.75rem; display:none; margin-left:0.2rem;"></span>
+      </a>
       <a href="{{ url_for('profile') }}">Profile</a>
       <a href="{{ url_for('logout') }}" class="right">Log out ({{ user.name or user.email }})</a>
     {% else %}
@@ -26,5 +29,23 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+
+  {% if user %}
+  <script>
+  async function pollUnread() {
+    try {
+      const res = await fetch('/api/unread_count');
+      if (!res.ok) return;
+      const { count } = await res.json();
+      const badge = document.getElementById('unread-badge');
+      if (!badge) return;
+      if (count > 0) { badge.style.display = 'inline'; badge.textContent = count; }
+      else { badge.style.display = 'none'; }
+    } catch (e) { /* ignore transient errors */ }
+  }
+  pollUnread();
+  setInterval(pollUnread, 8000);
+  </script>
+  {% endif %}
 </body>
 </html>

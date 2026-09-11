@@ -82,3 +82,60 @@ def find_nearby_printers(project, user_lat, user_lng, radius_km=200):
         printer["mismatch_reasons"] = _mismatch_reasons(printer, project)
 
     return printers
+
+
+def browse_printers(user_lat, user_lng, page=1, per_page=10):
+    """All printers, nearest first, with average rating/review count and a
+    few recent review comments each. Returns (printers, total_count)."""
+    offset = (page - 1) * per_page
+
+    with get_conn() as conn:
+        with dict_cursor(conn) as cur:
+            cur.execute("SELECT COUNT(*) AS cnt FROM printers")
+            total = cur.fetchone()["cnt"]
+
+            cur.execute(
+                f"""
+                SELECT pr.*, {HAVERSINE_KM} AS distance_km, pe.name AS owner_name,
+                       COALESCE(rv.avg_rating, 0) AS avg_rating,
+                       COALESCE(rv.review_count, 0) AS review_count
+                FROM printers pr
+                JOIN people pe ON pe.id = pr.owner_id
+                LEFT JOIN (
+                    SELECT printer_id, AVG(rating)::numeric(3,2) AS avg_rating,
+                           COUNT(*) AS review_count
+                    FROM reviews GROUP BY printer_id
+                ) rv ON rv.printer_id = pr.id
+                ORDER BY distance_km ASC
+                LIMIT %(limit)s OFFSET %(offset)s
+                """,
+                {
+                    "user_lat": user_lat, "user_lng": user_lng,
+                    "limit": per_page, "offset": offset,
+                },
+            )
+            printers = cur.fetchall()
+
+            printer_ids = [p["id"] for p in printers]
+            comments_by_printer = {pid: [] for pid in printer_ids}
+            if printer_ids:
+                cur.execute(
+                    """
+                    SELECT rv.printer_id, rv.rating, rv.comment, rv.created_at,
+                           pe.name AS reviewer_name
+                    FROM reviews rv
+                    JOIN people pe ON pe.id = rv.requester_id
+                    WHERE rv.printer_id = ANY(%s) AND rv.comment IS NOT NULL AND rv.comment != ''
+                    ORDER BY rv.created_at DESC
+                    """,
+                    (printer_ids,),
+                )
+                for row in cur.fetchall():
+                    bucket = comments_by_printer[row["printer_id"]]
+                    if len(bucket) < 3:
+                        bucket.append(row)
+
+    for printer in printers:
+        printer["recent_comments"] = comments_by_printer.get(printer["id"], [])
+
+    return printers, total

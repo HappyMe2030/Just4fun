@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Rate {{ order.printer_name }}</h1>
+<p class="muted">Project: {{ order.project_title }}</p>
+<form method="post" class="card">
+  <label>Rating</label>
+  <select name="rating" required>
+    <option value="" disabled {{ "" if existing else "selected" }}>Choose a rating</option>
+    {% for n in [5,4,3,2,1] %}
+      <option value="{{ n }}" {{ "selected" if existing and existing.rating == n }}>{{ n }} star{{ "s" if n != 1 }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Comment (optional)</label>
+  <textarea name="comment" rows="4" placeholder="How was the print, communication, pickup...">{{ existing.comment if existing else "" }}</textarea>
+
+  <button type="submit">{{ "Update review" if existing else "Submit review" }}</button>
+</form>
+{% endblock %}

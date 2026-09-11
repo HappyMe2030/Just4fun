@@ -22,4 +22,40 @@
 {% else %}
   <p class="muted">You haven't listed any printers yet.</p>
 {% endif %}
+
+<h2>Printers near you</h2>
+{% if not has_location %}
+  <div class="flash">Set your <a href="{{ url_for('profile') }}">location</a> to browse nearby printers.</div>
+{% elif nearby_printers %}
+  {% for pr in nearby_printers %}
+    <div class="card">
+      <h3>{{ pr.name }} <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
+      <p class="muted">Owner: {{ pr.owner_name }}</p>
+      <span class="tag">{{ pr.technology }}</span>
+      {% for m in pr.materials %}<span class="tag">{{ m }}</span>{% endfor %}
+      <p class="muted">Build volume: {{ pr.build_volume_x_mm }} × {{ pr.build_volume_y_mm }} × {{ pr.build_volume_z_mm }} mm</p>
+
+      {% if pr.review_count > 0 %}
+        <p>★ {{ pr.avg_rating }}/5 <span class="muted">({{ pr.review_count }} review{{ "s" if pr.review_count != 1 }})</span></p>
+        {% for c in pr.recent_comments %}
+          <p class="muted" style="margin:0.2rem 0;">"{{ c.comment }}" — {{ c.reviewer_name }} ({{ c.rating }}★)</p>
+        {% endfor %}
+      {% else %}
+        <p class="muted">No reviews yet</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <div style="display:flex; gap:1rem; align-items:center; margin-top:1rem;">
+    {% if page > 1 %}
+      <a class="btn secondary" href="{{ url_for('list_printers', page=page-1) }}">← Previous</a>
+    {% endif %}
+    <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}
+      <a class="btn secondary" href="{{ url_for('list_printers', page=page+1) }}">Next →</a>
+    {% endif %}
+  </div>
+{% else %}
+  <p class="muted">No printers listed yet.</p>
+{% endif %}
 {% endblock %}

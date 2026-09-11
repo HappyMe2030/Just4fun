@@ -12,7 +12,7 @@ from flask import (
 import db
 from constants import MATERIALS, NOZZLE_DIAMETERS_MM, TECHNOLOGIES
 from images import InvalidImage, process_image
-from matching import find_nearby_printers
+from matching import find_nearby_printers, browse_printers
 from tracing import init_tracing
 
 app = Flask(__name__)
@@ -160,7 +160,21 @@ def list_printers():
                 (g.person["id"],),
             )
             my_printers = cur.fetchall()
-    return render_template("printers_list.html", my_printers=my_printers)
+
+    has_location = g.person["latitude"] is not None
+    per_page = 10
+    page = max(1, request.args.get("page", 1, type=int))
+    nearby_printers, total = [], 0
+    if has_location:
+        nearby_printers, total = browse_printers(
+            g.person["latitude"], g.person["longitude"], page=page, per_page=per_page
+        )
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    return render_template(
+        "printers_list.html", my_printers=my_printers, has_location=has_location,
+        nearby_printers=nearby_printers, page=page, total_pages=total_pages,
+    )
 
 
 @app.route("/printers/add", methods=["GET", "POST"])
@@ -587,6 +601,102 @@ def send_message(order_id):
     return {"ok": True}
 
 
+@app.route("/orders/<int:order_id>/mark_read", methods=["POST"])
+@login_required
+def mark_read(order_id):
+    order, role = get_order_for_participant(order_id)
+    if not order:
+        abort(403)
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO chat_reads (order_id, person_id, last_read_at)
+                VALUES (%s, %s, now())
+                ON CONFLICT (order_id, person_id) DO UPDATE SET last_read_at = now()
+                """,
+                (order_id, g.person["id"]),
+            )
+        conn.commit()
+    return {"ok": True}
+
+
+@app.route("/api/unread_count")
+@login_required
+def api_unread_count():
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM messages m
+                JOIN orders o ON o.id = m.order_id
+                JOIN printers pr ON pr.id = o.printer_id
+                LEFT JOIN chat_reads cr
+                    ON cr.order_id = o.id AND cr.person_id = %(pid)s
+                WHERE (o.requester_id = %(pid)s OR pr.owner_id = %(pid)s)
+                  AND m.sender_id != %(pid)s
+                  AND m.created_at > COALESCE(cr.last_read_at, '-infinity'::timestamptz)
+                """,
+                {"pid": g.person["id"]},
+            )
+            count = cur.fetchone()["cnt"]
+    return {"count": count}
+
+
+@app.route("/orders/<int:order_id>/review", methods=["GET", "POST"])
+@login_required
+def review_order(order_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT o.*, p.title AS project_title, pr.name AS printer_name
+                FROM orders o
+                JOIN projects p ON p.id = o.project_id
+                JOIN printers pr ON pr.id = o.printer_id
+                WHERE o.id = %s
+                """,
+                (order_id,),
+            )
+            order = cur.fetchone()
+
+    if not order or order["requester_id"] != g.person["id"]:
+        flash("You can only review your own orders.")
+        return redirect(url_for("list_orders"))
+    if order["status"] != "completed":
+        flash("You can only review an order once it's completed.")
+        return redirect(url_for("list_orders"))
+
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM reviews WHERE order_id = %s", (order_id,))
+            existing = cur.fetchone()
+
+    if request.method == "POST":
+        rating = int(request.form["rating"])
+        comment = request.form.get("comment", "").strip() or None
+        if rating < 1 or rating > 5:
+            flash("Rating must be between 1 and 5.")
+            return redirect(url_for("review_order", order_id=order_id))
+        with db.get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO reviews (order_id, printer_id, requester_id, rating, comment)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (order_id) DO UPDATE
+                        SET rating = EXCLUDED.rating, comment = EXCLUDED.comment
+                    """,
+                    (order_id, order["printer_id"], g.person["id"], rating, comment),
+                )
+            conn.commit()
+        flash("Thanks for the feedback!")
+        return redirect(url_for("list_orders"))
+
+    return render_template("review_form.html", order=order, existing=existing)
+
+
 @app.route("/orders")
 @login_required
 def list_orders():
@@ -595,11 +705,12 @@ def list_orders():
             cur.execute(
                 """
                 SELECT o.*, p.title AS project_title, pr.name AS printer_name,
-                       pe.name AS owner_name
+                       pe.name AS owner_name, rv.id AS review_id, rv.rating AS review_rating
                 FROM orders o
                 JOIN projects p ON p.id = o.project_id
                 JOIN printers pr ON pr.id = o.printer_id
                 JOIN people pe ON pe.id = pr.owner_id
+                LEFT JOIN reviews rv ON rv.order_id = o.id
                 WHERE o.requester_id = %s
                 ORDER BY o.created_at DESC
                 """,
