@@ -9,6 +9,9 @@
     <span class="tag">{{ p.required_technology }}</span>
     {% for m in p.required_materials %}<span class="tag">{{ m }}</span>{% endfor %}
     <p class="muted">Needs volume ≥ {{ p.required_build_volume_x_mm }} × {{ p.required_build_volume_y_mm }} × {{ p.required_build_volume_z_mm }} mm</p>
+    {% if person and p.creator_id == person.id %}
+      <a class="btn secondary" href="{{ url_for('edit_project', project_id=p.id) }}">Edit</a>
+    {% endif %}
   </div>
 {% else %}
   <p class="muted">No projects yet.</p>

@@ -1,54 +1,59 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Add a printer</h1>
-{% if not person.latitude %}
+<h1>{{ "Edit printer" if printer else "Add a printer" }}</h1>
+{% if not printer and not person.latitude %}
   <div class="flash">Set your <a href="{{ url_for('profile') }}">location</a> first — new printers default to it, and you can adjust below.</div>
 {% endif %}
 <form method="post" class="card">
   <label>Name</label>
-  <input type="text" name="name" required placeholder="e.g. Garage Bambu A1">
+  <input type="text" name="name" required placeholder="e.g. Garage Bambu A1" value="{{ printer.name if printer else '' }}">
 
   <label>Description</label>
-  <textarea name="description" rows="2"></textarea>
+  <textarea name="description" rows="2">{{ printer.description if printer else '' }}</textarea>
 
   <label>Technology</label>
   <select name="technology" required>
-    {% for t in technologies %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    {% for t in technologies %}
+      <option value="{{ t }}" {{ "selected" if printer and printer.technology == t }}>{{ t }}</option>
+    {% endfor %}
   </select>
 
   <label>Materials supported</label>
   <div class="checkboxes">
     {% for m in materials %}
-      <label><input type="checkbox" name="materials" value="{{ m }}"> {{ m }}</label>
+      <label><input type="checkbox" name="materials" value="{{ m }}"
+        {{ "checked" if printer and m in printer.materials }}> {{ m }}</label>
     {% endfor %}
   </div>
 
   <label>Nozzle diameter (mm, if FDM)</label>
   <select name="nozzle_diameter_mm">
     <option value="">N/A</option>
-    {% for n in nozzle_diameters %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+    {% for n in nozzle_diameters %}
+      <option value="{{ n }}" {{ "selected" if printer and printer.nozzle_diameter_mm and printer.nozzle_diameter_mm|float == n }}>{{ n }}</option>
+    {% endfor %}
   </select>
 
   <label>Build volume (mm)</label>
   <div style="display:flex; gap:0.5rem;">
-    <input type="number" name="build_volume_x_mm" placeholder="X" required min="1">
-    <input type="number" name="build_volume_y_mm" placeholder="Y" required min="1">
-    <input type="number" name="build_volume_z_mm" placeholder="Z" required min="1">
+    <input type="number" name="build_volume_x_mm" placeholder="X" required min="1" value="{{ printer.build_volume_x_mm if printer else '' }}">
+    <input type="number" name="build_volume_y_mm" placeholder="Y" required min="1" value="{{ printer.build_volume_y_mm if printer else '' }}">
+    <input type="number" name="build_volume_z_mm" placeholder="Z" required min="1" value="{{ printer.build_volume_z_mm if printer else '' }}">
   </div>
 
   <label>Max nozzle temp (°C, optional)</label>
-  <input type="number" name="max_nozzle_temp_c">
+  <input type="number" name="max_nozzle_temp_c" value="{{ printer.max_nozzle_temp_c if printer and printer.max_nozzle_temp_c else '' }}">
 
   <div class="checkboxes" style="margin-top:0.8rem;">
-    <label><input type="checkbox" name="heated_bed"> Heated bed</label>
-    <label><input type="checkbox" name="enclosed"> Enclosed chamber</label>
+    <label><input type="checkbox" name="heated_bed" {{ "checked" if printer and printer.heated_bed }}> Heated bed</label>
+    <label><input type="checkbox" name="enclosed" {{ "checked" if printer and printer.enclosed }}> Enclosed chamber</label>
   </div>
 
   <label>Latitude</label>
-  <input type="text" name="latitude" value="{{ person.latitude or '' }}" required>
+  <input type="text" name="latitude" value="{{ printer.latitude if printer else (person.latitude or '') }}" required>
   <label>Longitude</label>
-  <input type="text" name="longitude" value="{{ person.longitude or '' }}" required>
+  <input type="text" name="longitude" value="{{ printer.longitude if printer else (person.longitude or '') }}" required>
 
-  <button type="submit">Add printer</button>
+  <button type="submit">{{ "Save changes" if printer else "Add printer" }}</button>
 </form>
 {% endblock %}

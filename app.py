@@ -9,7 +9,7 @@ from flask import (
 
 import db
 from constants import MATERIALS, NOZZLE_DIAMETERS_MM, TECHNOLOGIES
-from matching import find_matching_printers
+from matching import find_nearby_printers
 from tracing import init_tracing
 
 app = Flask(__name__)
@@ -198,6 +198,57 @@ def add_printer():
     )
 
 
+@app.route("/printers/<int:printer_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_printer(printer_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM printers WHERE id = %s", (printer_id,))
+            printer = cur.fetchone()
+    if not printer:
+        flash("Printer not found.")
+        return redirect(url_for("list_printers"))
+    if printer["owner_id"] != g.person["id"]:
+        flash("You can only edit your own printers.")
+        return redirect(url_for("list_printers"))
+
+    if request.method == "POST":
+        f = request.form
+        materials = request.form.getlist("materials")
+        nozzle = f.get("nozzle_diameter_mm") or None
+        max_temp = f.get("max_nozzle_temp_c") or None
+        with db.get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE printers SET
+                        name=%s, description=%s, latitude=%s, longitude=%s,
+                        technology=%s, materials=%s, nozzle_diameter_mm=%s,
+                        build_volume_x_mm=%s, build_volume_y_mm=%s, build_volume_z_mm=%s,
+                        heated_bed=%s, enclosed=%s, max_nozzle_temp_c=%s
+                    WHERE id = %s
+                    """,
+                    (
+                        f["name"], f.get("description"),
+                        float(f["latitude"]), float(f["longitude"]),
+                        f["technology"], materials, nozzle,
+                        int(f["build_volume_x_mm"]), int(f["build_volume_y_mm"]),
+                        int(f["build_volume_z_mm"]),
+                        "heated_bed" in f, "enclosed" in f, max_temp,
+                        printer_id,
+                    ),
+                )
+            conn.commit()
+        flash("Printer updated.")
+        return redirect(url_for("list_printers"))
+
+    return render_template(
+        "printer_form.html",
+        technologies=TECHNOLOGIES, materials=MATERIALS,
+        nozzle_diameters=NOZZLE_DIAMETERS_MM, printer=printer,
+    )
+
+
 # ---------- projects ----------
 
 @app.route("/projects")
@@ -250,6 +301,58 @@ def add_project():
     )
 
 
+@app.route("/projects/<int:project_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_project(project_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
+            project = cur.fetchone()
+    if not project:
+        flash("Project not found.")
+        return redirect(url_for("list_projects"))
+    if project["creator_id"] != g.person["id"]:
+        flash("You can only edit your own projects.")
+        return redirect(url_for("list_projects"))
+
+    if request.method == "POST":
+        f = request.form
+        materials = request.form.getlist("required_materials")
+        max_nozzle = f.get("required_nozzle_diameter_max_mm") or None
+        with db.get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE projects SET
+                        title=%s, description=%s, required_technology=%s,
+                        required_materials=%s, required_build_volume_x_mm=%s,
+                        required_build_volume_y_mm=%s, required_build_volume_z_mm=%s,
+                        required_nozzle_diameter_max_mm=%s, required_heated_bed=%s,
+                        required_enclosed=%s
+                    WHERE id = %s
+                    """,
+                    (
+                        f["title"], f.get("description"), f["required_technology"],
+                        materials,
+                        int(f["required_build_volume_x_mm"]),
+                        int(f["required_build_volume_y_mm"]),
+                        int(f["required_build_volume_z_mm"]),
+                        max_nozzle,
+                        "required_heated_bed" in f, "required_enclosed" in f,
+                        project_id,
+                    ),
+                )
+            conn.commit()
+        flash("Project updated.")
+        return redirect(url_for("project_detail", project_id=project_id))
+
+    return render_template(
+        "project_form.html",
+        technologies=TECHNOLOGIES, materials=MATERIALS,
+        nozzle_diameters=NOZZLE_DIAMETERS_MM, project=project,
+    )
+
+
 @app.route("/projects/<int:project_id>")
 @login_required
 def project_detail(project_id):
@@ -264,12 +367,13 @@ def project_detail(project_id):
     has_location = g.person["latitude"] is not None
     printers = []
     if has_location:
-        printers = find_matching_printers(
+        printers = find_nearby_printers(
             project, g.person["latitude"], g.person["longitude"]
         )
+    is_owner = project["creator_id"] == g.person["id"]
     return render_template(
         "project_detail.html", project=project, printers=printers,
-        has_location=has_location,
+        has_location=has_location, is_owner=is_owner,
     )
 
 

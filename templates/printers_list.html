@@ -16,6 +16,7 @@
         {% if p.heated_bed %}· Heated bed{% endif %}
         {% if p.enclosed %}· Enclosed{% endif %}
       </p>
+      <a class="btn secondary" href="{{ url_for('edit_printer', printer_id=p.id) }}">Edit</a>
     </div>
   {% endfor %}
 {% else %}
