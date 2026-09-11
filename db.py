@@ -115,6 +115,18 @@ def init_db():
                 )
                 """
             )
+            # --- messages (per-order chat between requester and printer owner) ---
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                    id SERIAL PRIMARY KEY,
+                    order_id INTEGER NOT NULL REFERENCES orders(id),
+                    sender_id INTEGER NOT NULL REFERENCES people(id),
+                    body TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
         conn.commit()
 
 

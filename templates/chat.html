@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Chat — {{ order.project_title }}</h1>
+<p class="muted">
+  Printer: {{ order.printer_name }} · Status: <span class="status status-{{ order.status }}">{{ order.status }}</span>
+  · <a href="{{ url_for('list_orders') }}">Back to orders</a>
+</p>
+
+<div class="card">
+  <div id="messages" style="max-height:400px; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem;">
+    <p class="muted">Loading messages…</p>
+  </div>
+  <form id="send-form" style="display:flex; gap:0.5rem; margin-top:1rem;">
+    <input type="text" id="message-input" placeholder="Write a message…" maxlength="2000"
+           style="flex:1; padding:0.5rem; border:1px solid #ccc; border-radius:4px;" autocomplete="off">
+    <button type="submit" style="margin-top:0;">Send</button>
+  </form>
+</div>
+
+<script>
+const orderId = {{ order.id }};
+const messagesEl = document.getElementById('messages');
+const form = document.getElementById('send-form');
+const input = document.getElementById('message-input');
+let lastCount = -1;
+
+function render(messages) {
+  if (messages.length === lastCount) return;  // avoid needless re-render/scroll jumps
+  lastCount = messages.length;
+  messagesEl.innerHTML = '';
+  if (messages.length === 0) {
+    messagesEl.innerHTML = '<p class="muted">No messages yet — say hello.</p>';
+    return;
+  }
+  for (const m of messages) {
+    const bubble = document.createElement('div');
+    bubble.style.alignSelf = m.is_mine ? 'flex-end' : 'flex-start';
+    bubble.style.background = m.is_mine ? '#2e5cff' : '#eee';
+    bubble.style.color = m.is_mine ? 'white' : '#222';
+    bubble.style.padding = '0.5rem 0.8rem';
+    bubble.style.borderRadius = '10px';
+    bubble.style.maxWidth = '75%';
+    const who = document.createElement('div');
+    who.style.fontSize = '0.75rem';
+    who.style.opacity = '0.75';
+    who.textContent = m.is_mine ? 'You' : m.sender_name;
+    const text = document.createElement('div');
+    text.textContent = m.body;
+    bubble.appendChild(who);
+    bubble.appendChild(text);
+    messagesEl.appendChild(bubble);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function poll() {
+  try {
+    const res = await fetch(`/orders/${orderId}/messages.json`);
+    if (res.ok) render((await res.json()).messages);
+  } catch (e) { /* ignore transient errors, retry on next tick */ }
+}
+
+form.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const body = input.value.trim();
+  if (!body) return;
+  input.value = '';
+  await fetch(`/orders/${orderId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
+  lastCount = -1;  // force re-render on next poll
+  poll();
+});
+
+poll();
+setInterval(poll, 3000);
+</script>
+{% endblock %}

@@ -495,6 +495,98 @@ def order_transition(order_id, new_status):
     return redirect(url_for("list_orders"))
 
 
+def get_order_for_participant(order_id):
+    """Loads an order, returning (order, role) if the current person is the
+    requester or the printer's owner, otherwise (None, None)."""
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT o.*, p.title AS project_title, pr.name AS printer_name,
+                       pr.owner_id AS printer_owner_id
+                FROM orders o
+                JOIN projects p ON p.id = o.project_id
+                JOIN printers pr ON pr.id = o.printer_id
+                WHERE o.id = %s
+                """,
+                (order_id,),
+            )
+            order = cur.fetchone()
+    if not order:
+        return None, None
+    if order["requester_id"] == g.person["id"]:
+        return order, "requester"
+    if order["printer_owner_id"] == g.person["id"]:
+        return order, "owner"
+    return None, None
+
+
+@app.route("/orders/<int:order_id>/chat")
+@login_required
+def order_chat(order_id):
+    order, role = get_order_for_participant(order_id)
+    if not order:
+        flash("You don't have access to that order's chat.")
+        return redirect(url_for("list_orders"))
+    return render_template("chat.html", order=order, role=role)
+
+
+@app.route("/orders/<int:order_id>/messages.json")
+@login_required
+def order_messages(order_id):
+    order, role = get_order_for_participant(order_id)
+    if not order:
+        abort(403)
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT m.id, m.body, m.created_at, m.sender_id, pe.name AS sender_name
+                FROM messages m
+                JOIN people pe ON pe.id = m.sender_id
+                WHERE m.order_id = %s
+                ORDER BY m.created_at ASC
+                """,
+                (order_id,),
+            )
+            rows = cur.fetchall()
+    return {
+        "messages": [
+            {
+                "id": r["id"],
+                "body": r["body"],
+                "created_at": r["created_at"].isoformat(),
+                "is_mine": r["sender_id"] == g.person["id"],
+                "sender_name": r["sender_name"],
+            }
+            for r in rows
+        ]
+    }
+
+
+@app.route("/orders/<int:order_id>/messages", methods=["POST"])
+@login_required
+def send_message(order_id):
+    order, role = get_order_for_participant(order_id)
+    if not order:
+        abort(403)
+    if request.is_json:
+        body = (request.get_json(silent=True) or {}).get("body") or ""
+    else:
+        body = request.form.get("body") or ""
+    body = body.strip()
+    if not body:
+        return {"error": "empty"}, 400
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO messages (order_id, sender_id, body) VALUES (%s, %s, %s)",
+                (order_id, g.person["id"], body[:2000]),
+            )
+        conn.commit()
+    return {"ok": True}
+
+
 @app.route("/orders")
 @login_required
 def list_orders():

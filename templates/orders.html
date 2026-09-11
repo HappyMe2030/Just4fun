@@ -7,6 +7,7 @@
   <div class="card">
     <h3>{{ o.project_title }} <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
     <p class="muted">Printer: {{ o.printer_name }} (owner: {{ o.owner_name }})</p>
+    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat</a>
     {% if o.status == 'ready_for_pickup' %}
       <p><strong>Ready for pickup</strong> at the printer's location.</p>
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='completed') }}">
@@ -27,6 +28,7 @@
   <div class="card">
     <h3>{{ o.project_title }} <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
     <p class="muted">Printer: {{ o.printer_name }} · Requested by: {{ o.requester_name }}</p>
+    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat with requester</a>
     {% if o.status == 'pending' %}
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='accepted') }}" style="display:inline">
         <button type="submit">Accept</button>
