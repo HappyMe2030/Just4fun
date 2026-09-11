@@ -2,18 +2,22 @@ import os
 from functools import wraps
 from urllib.parse import quote_plus, urlencode
 
+import psycopg2
 from authlib.integrations.flask_client import OAuth
 from flask import (
-    Flask, flash, g, redirect, render_template, request, session, url_for,
+    Flask, Response, abort, flash, g, redirect, render_template, request,
+    session, url_for,
 )
 
 import db
 from constants import MATERIALS, NOZZLE_DIAMETERS_MM, TECHNOLOGIES
+from images import InvalidImage, process_image
 from matching import find_nearby_printers
 from tracing import init_tracing
 
 app = Flask(__name__)
 app.secret_key = os.environ["APP_SECRET_KEY"]
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5MB upload limit
 
 AUTH0_DOMAIN = os.environ["AUTH0_DOMAIN"]
 AUTH0_CLIENT_ID = os.environ["AUTH0_CLIENT_ID"]
@@ -268,6 +272,21 @@ def add_project():
         f = request.form
         materials = request.form.getlist("required_materials")
         max_nozzle = f.get("required_nozzle_diameter_max_mm") or None
+
+        image_data, image_mime = None, None
+        image_file = request.files.get("image")
+        if image_file and image_file.filename:
+            try:
+                resized_bytes, image_mime = process_image(image_file)
+            except InvalidImage as e:
+                flash(str(e))
+                return render_template(
+                    "project_form.html",
+                    technologies=TECHNOLOGIES, materials=MATERIALS,
+                    nozzle_diameters=NOZZLE_DIAMETERS_MM,
+                )
+            image_data = psycopg2.Binary(resized_bytes)
+
         with db.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -277,8 +296,8 @@ def add_project():
                         required_materials, required_build_volume_x_mm,
                         required_build_volume_y_mm, required_build_volume_z_mm,
                         required_nozzle_diameter_max_mm, required_heated_bed,
-                        required_enclosed
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        required_enclosed, image_data, image_mime
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         g.person["id"], f["title"], f.get("description"),
@@ -288,6 +307,7 @@ def add_project():
                         int(f["required_build_volume_z_mm"]),
                         max_nozzle,
                         "required_heated_bed" in f, "required_enclosed" in f,
+                        image_data, image_mime,
                     ),
                 )
             conn.commit()
@@ -319,6 +339,23 @@ def edit_project(project_id):
         f = request.form
         materials = request.form.getlist("required_materials")
         max_nozzle = f.get("required_nozzle_diameter_max_mm") or None
+
+        image_data, image_mime = project["image_data"], project["image_mime"]
+        image_file = request.files.get("image")
+        if image_file and image_file.filename:
+            try:
+                resized_bytes, image_mime = process_image(image_file)
+            except InvalidImage as e:
+                flash(str(e))
+                return render_template(
+                    "project_form.html",
+                    technologies=TECHNOLOGIES, materials=MATERIALS,
+                    nozzle_diameters=NOZZLE_DIAMETERS_MM, project=project,
+                )
+            image_data = psycopg2.Binary(resized_bytes)
+        elif "remove_image" in f:
+            image_data, image_mime = None, None
+
         with db.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -328,7 +365,7 @@ def edit_project(project_id):
                         required_materials=%s, required_build_volume_x_mm=%s,
                         required_build_volume_y_mm=%s, required_build_volume_z_mm=%s,
                         required_nozzle_diameter_max_mm=%s, required_heated_bed=%s,
-                        required_enclosed=%s
+                        required_enclosed=%s, image_data=%s, image_mime=%s
                     WHERE id = %s
                     """,
                     (
@@ -339,6 +376,7 @@ def edit_project(project_id):
                         int(f["required_build_volume_z_mm"]),
                         max_nozzle,
                         "required_heated_bed" in f, "required_enclosed" in f,
+                        image_data, image_mime,
                         project_id,
                     ),
                 )
@@ -351,6 +389,20 @@ def edit_project(project_id):
         technologies=TECHNOLOGIES, materials=MATERIALS,
         nozzle_diameters=NOZZLE_DIAMETERS_MM, project=project,
     )
+
+
+@app.route("/projects/<int:project_id>/image")
+def project_image(project_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                "SELECT image_data, image_mime FROM projects WHERE id = %s",
+                (project_id,),
+            )
+            row = cur.fetchone()
+    if not row or not row["image_data"]:
+        abort(404)
+    return Response(bytes(row["image_data"]), mimetype=row["image_mime"] or "application/octet-stream")
 
 
 @app.route("/projects/<int:project_id>")

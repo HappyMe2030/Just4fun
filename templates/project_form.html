@@ -1,12 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>{{ "Edit project" if project else "Add a project" }}</h1>
-<form method="post" class="card">
+<form method="post" class="card" enctype="multipart/form-data">
   <label>Title</label>
   <input type="text" name="title" required placeholder="e.g. Articulated dragon toy" value="{{ project.title if project else '' }}">
 
   <label>Description</label>
   <textarea name="description" rows="3">{{ project.description if project else '' }}</textarea>
+
+  <label>Image (optional)</label>
+  {% if project and project.image_data %}
+    <p><img src="{{ url_for('project_image', project_id=project.id) }}" alt="" style="max-width:220px; border-radius:6px; display:block; margin-bottom:0.4rem;"></p>
+    <label style="font-weight:400;"><input type="checkbox" name="remove_image"> Remove current image</label>
+  {% endif %}
+  <input type="file" name="image" accept="image/*">
+  <p class="muted" style="margin-top:0.2rem;">Uploading a new image replaces the current one. Max 5MB.</p>
 
   <label>Required technology</label>
   <select name="required_technology" required>

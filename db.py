@@ -91,10 +91,15 @@ def init_db():
                     required_nozzle_diameter_max_mm NUMERIC,
                     required_heated_bed BOOLEAN NOT NULL DEFAULT false,
                     required_enclosed BOOLEAN NOT NULL DEFAULT false,
+                    image_data BYTEA,
+                    image_mime TEXT,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 )
                 """
             )
+            # additive, safe even if the table already existed
+            cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS image_data BYTEA")
+            cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS image_mime TEXT")
 
             # --- orders ---
             cur.execute(

@@ -2,6 +2,9 @@
 {% block content %}
 <h1>{{ project.title }}</h1>
 <div class="card">
+  {% if project.image_data %}
+    <img src="{{ url_for('project_image', project_id=project.id) }}" alt="" style="max-width:100%; border-radius:6px; margin-bottom:0.8rem;">
+  {% endif %}
   <p>{{ project.description or "" }}</p>
   <span class="tag">{{ project.required_technology }}</span>
   {% for m in project.required_materials %}<span class="tag">{{ m }}</span>{% endfor %}

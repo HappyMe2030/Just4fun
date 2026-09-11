@@ -4,6 +4,9 @@
 <a class="btn" href="{{ url_for('add_project') }}">+ Post a project</a>
 {% for p in projects %}
   <div class="card">
+    {% if p.image_data %}
+      <img src="{{ url_for('project_image', project_id=p.id) }}" alt="" style="max-width:160px; float:right; border-radius:6px; margin-left:1rem;">
+    {% endif %}
     <h3><a href="{{ url_for('project_detail', project_id=p.id) }}">{{ p.title }}</a></h3>
     <p class="muted">{{ p.description or "" }}</p>
     <span class="tag">{{ p.required_technology }}</span>
