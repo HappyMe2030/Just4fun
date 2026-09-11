@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Your profile</h1>
+<div class="card">
+  <p><strong>Name:</strong> {{ user.name or "—" }}</p>
+  <p><strong>Email:</strong> {{ user.email or "—" }}</p>
+  <p><strong>Location:</strong>
+    {% if person.latitude %}
+      {{ "%.4f"|format(person.latitude) }}, {{ "%.4f"|format(person.longitude) }}
+    {% else %}
+      <span class="muted">Not set</span>
+    {% endif %}
+  </p>
+  <button id="locate-btn">Use my current location</button>
+  <p id="locate-status" class="muted"></p>
+</div>
+
+<form id="manual-form" method="post" action="{{ url_for('update_location') }}" class="card">
+  <h3>Or set it manually</h3>
+  <label>Latitude</label>
+  <input type="text" name="latitude" id="lat-field" value="{{ person.latitude or '' }}" required>
+  <label>Longitude</label>
+  <input type="text" name="longitude" id="lng-field" value="{{ person.longitude or '' }}" required>
+  <button type="submit">Save location</button>
+</form>
+
+<script>
+document.getElementById('locate-btn').addEventListener('click', function () {
+  const status = document.getElementById('locate-status');
+  if (!navigator.geolocation) {
+    status.textContent = 'Geolocation is not supported by your browser.';
+    return;
+  }
+  status.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(function (pos) {
+    document.getElementById('lat-field').value = pos.coords.latitude;
+    document.getElementById('lng-field').value = pos.coords.longitude;
+    status.textContent = 'Location found — click "Save location" to confirm.';
+  }, function (err) {
+    status.textContent = 'Could not get location: ' + err.message;
+  });
+});
+</script>
+{% endblock %}

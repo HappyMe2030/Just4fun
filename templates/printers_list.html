@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Printers</h1>
+<a class="btn" href="{{ url_for('add_printer') }}">+ Add a printer</a>
+
+<h2>Your printers</h2>
+{% if my_printers %}
+  {% for p in my_printers %}
+    <div class="card">
+      <h3>{{ p.name }}</h3>
+      <p class="muted">{{ p.description or "" }}</p>
+      <span class="tag">{{ p.technology }}</span>
+      {% for m in p.materials %}<span class="tag">{{ m }}</span>{% endfor %}
+      <p class="muted">Build volume: {{ p.build_volume_x_mm }} × {{ p.build_volume_y_mm }} × {{ p.build_volume_z_mm }} mm
+        {% if p.nozzle_diameter_mm %}· Nozzle {{ p.nozzle_diameter_mm }}mm{% endif %}
+        {% if p.heated_bed %}· Heated bed{% endif %}
+        {% if p.enclosed %}· Enclosed{% endif %}
+      </p>
+    </div>
+  {% endfor %}
+{% else %}
+  <p class="muted">You haven't listed any printers yet.</p>
+{% endif %}
+{% endblock %}

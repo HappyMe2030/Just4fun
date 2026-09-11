@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Add a project</h1>
+<form method="post" class="card">
+  <label>Title</label>
+  <input type="text" name="title" required placeholder="e.g. Articulated dragon toy">
+
+  <label>Description</label>
+  <textarea name="description" rows="3"></textarea>
+
+  <label>Required technology</label>
+  <select name="required_technology" required>
+    {% for t in technologies %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+  </select>
+
+  <label>Acceptable materials (any one of these is fine)</label>
+  <div class="checkboxes">
+    {% for m in materials %}
+      <label><input type="checkbox" name="required_materials" value="{{ m }}"> {{ m }}</label>
+    {% endfor %}
+  </div>
+
+  <label>Minimum build volume needed (mm)</label>
+  <div style="display:flex; gap:0.5rem;">
+    <input type="number" name="required_build_volume_x_mm" placeholder="X" required min="1">
+    <input type="number" name="required_build_volume_y_mm" placeholder="Y" required min="1">
+    <input type="number" name="required_build_volume_z_mm" placeholder="Z" required min="1">
+  </div>
+
+  <label>Max nozzle diameter needed for detail level (mm, optional)</label>
+  <select name="required_nozzle_diameter_max_mm">
+    <option value="">No preference</option>
+    {% for n in nozzle_diameters %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+  </select>
+
+  <div class="checkboxes" style="margin-top:0.8rem;">
+    <label><input type="checkbox" name="required_heated_bed"> Needs heated bed</label>
+    <label><input type="checkbox" name="required_enclosed"> Needs enclosed chamber</label>
+  </div>
+
+  <button type="submit">Post project</button>
+</form>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Projects</h1>
+<a class="btn" href="{{ url_for('add_project') }}">+ Post a project</a>
+{% for p in projects %}
+  <div class="card">
+    <h3><a href="{{ url_for('project_detail', project_id=p.id) }}">{{ p.title }}</a></h3>
+    <p class="muted">{{ p.description or "" }}</p>
+    <span class="tag">{{ p.required_technology }}</span>
+    {% for m in p.required_materials %}<span class="tag">{{ m }}</span>{% endfor %}
+    <p class="muted">Needs volume ≥ {{ p.required_build_volume_x_mm }} × {{ p.required_build_volume_y_mm }} × {{ p.required_build_volume_z_mm }} mm</p>
+  </div>
+{% else %}
+  <p class="muted">No projects yet.</p>
+{% endfor %}
+{% endblock %}

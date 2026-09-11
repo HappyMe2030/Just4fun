@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ project.title }}</h1>
+<div class="card">
+  <p>{{ project.description or "" }}</p>
+  <span class="tag">{{ project.required_technology }}</span>
+  {% for m in project.required_materials %}<span class="tag">{{ m }}</span>{% endfor %}
+  <p class="muted">Needs build volume ≥ {{ project.required_build_volume_x_mm }} × {{ project.required_build_volume_y_mm }} × {{ project.required_build_volume_z_mm }} mm
+    {% if project.required_nozzle_diameter_max_mm %}· Nozzle ≤ {{ project.required_nozzle_diameter_max_mm }}mm{% endif %}
+    {% if project.required_heated_bed %}· Needs heated bed{% endif %}
+    {% if project.required_enclosed %}· Needs enclosed chamber{% endif %}
+  </p>
+</div>
+
+<h2>Matching printers near you</h2>
+{% if not has_location %}
+  <div class="flash">Set your <a href="{{ url_for('profile') }}">location</a> to see nearby matches.</div>
+{% elif printers %}
+  {% for pr in printers %}
+    <div class="card">
+      <h3>{{ pr.name }} <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
+      <p class="muted">Owner: {{ pr.owner_name }}</p>
+      <span class="tag">{{ pr.technology }}</span>
+      {% for m in pr.materials %}<span class="tag">{{ m }}</span>{% endfor %}
+      <p class="muted">Build volume: {{ pr.build_volume_x_mm }} × {{ pr.build_volume_y_mm }} × {{ pr.build_volume_z_mm }} mm</p>
+      <form method="post" action="{{ url_for('create_order') }}">
+        <input type="hidden" name="project_id" value="{{ project.id }}">
+        <input type="hidden" name="printer_id" value="{{ pr.id }}">
+        <button type="submit">Request this printer</button>
+      </form>
+    </div>
+  {% endfor %}
+{% else %}
+  <p class="muted">No matching printers found nearby yet.</p>
+{% endif %}
+{% endblock %}

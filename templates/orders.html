@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Orders</h1>
+
+<h2>Requests you've made</h2>
+{% for o in my_requests %}
+  <div class="card">
+    <h3>{{ o.project_title }} <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
+    <p class="muted">Printer: {{ o.printer_name }} (owner: {{ o.owner_name }})</p>
+    {% if o.status == 'ready_for_pickup' %}
+      <p><strong>Ready for pickup</strong> at the printer's location.</p>
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='completed') }}">
+        <button type="submit">Mark picked up</button>
+      </form>
+    {% elif o.status == 'pending' %}
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='cancelled') }}">
+        <button type="submit" class="secondary">Cancel request</button>
+      </form>
+    {% endif %}
+  </div>
+{% else %}
+  <p class="muted">You haven't requested any prints yet.</p>
+{% endfor %}
+
+<h2>Requests for your printers</h2>
+{% for o in incoming %}
+  <div class="card">
+    <h3>{{ o.project_title }} <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
+    <p class="muted">Printer: {{ o.printer_name }} · Requested by: {{ o.requester_name }}</p>
+    {% if o.status == 'pending' %}
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='accepted') }}" style="display:inline">
+        <button type="submit">Accept</button>
+      </form>
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='rejected') }}" style="display:inline">
+        <button type="submit" class="danger">Reject</button>
+      </form>
+    {% elif o.status == 'accepted' %}
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='printing') }}">
+        <button type="submit">Start printing</button>
+      </form>
+    {% elif o.status == 'printing' %}
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='ready_for_pickup') }}">
+        <button type="submit">Mark ready for pickup</button>
+      </form>
+    {% endif %}
+  </div>
+{% else %}
+  <p class="muted">No requests for your printers yet.</p>
+{% endfor %}
+{% endblock %}

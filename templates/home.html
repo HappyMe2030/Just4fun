@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if user %}
+    <h1>Hi, {{ user.name or user.email }}</h1>
+    {% if not has_location %}
+      <div class="card">
+        <p><strong>Set your location</strong> so we can match you with nearby printers.</p>
+        <a class="btn" href="{{ url_for('profile') }}">Set my location</a>
+      </div>
+    {% endif %}
+    <div class="card">
+      <h3>Browse projects</h3>
+      <p class="muted">Pick a project, find a nearby matching printer, and request a print.</p>
+      <a class="btn" href="{{ url_for('list_projects') }}">View projects</a>
+    </div>
+    <div class="card">
+      <h3>Own a 3D printer?</h3>
+      <p class="muted">List it with its capabilities so people nearby can order prints.</p>
+      <a class="btn" href="{{ url_for('add_printer') }}">Add your printer</a>
+    </div>
+  {% else %}
+    <h1>Welcome</h1>
+    <p>Connect 3D printer owners with people who have something to print.</p>
+    <a class="btn" href="{{ url_for('login') }}">Log in / Sign up</a>
+  {% endif %}
+{% endblock %}

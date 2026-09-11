@@ -1,0 +1,36 @@
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; background: #f6f6f8; color: #222; }
+.topnav { display: flex; align-items: center; gap: 1.2rem; padding: 0.9rem 1.5rem;
+          background: #1c1c24; color: white; }
+.topnav a { color: #ddd; text-decoration: none; }
+.topnav a.brand { color: white; font-weight: 700; margin-right: 1rem; }
+.topnav a.right { margin-left: auto; }
+.topnav a:hover { color: #fff; }
+main { max-width: 900px; margin: 2rem auto; padding: 0 1.2rem; }
+h1, h2 { margin-top: 0; }
+.card { background: white; border-radius: 8px; padding: 1.2rem 1.5rem; margin-bottom: 1rem;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.card h3 { margin-top: 0; }
+form label { display: block; margin-top: 0.8rem; font-weight: 600; font-size: 0.9rem; }
+form input[type=text], form input[type=number], form textarea, form select {
+  width: 100%; padding: 0.5rem; margin-top: 0.25rem; border: 1px solid #ccc; border-radius: 4px;
+  font-size: 1rem; font-family: inherit;
+}
+form .checkboxes label { display: inline-block; font-weight: 400; margin-right: 1rem; }
+button, .btn { background: #2e5cff; color: white; border: none; padding: 0.55rem 1.1rem;
+        border-radius: 4px; font-size: 1rem; cursor: pointer; text-decoration: none;
+        display: inline-block; margin-top: 1rem; }
+button.secondary, .btn.secondary { background: #666; }
+button.danger, .btn.danger { background: #c0392b; }
+.tag { display: inline-block; background: #eef; padding: 0.15rem 0.5rem; border-radius: 4px;
+       font-size: 0.8rem; margin-right: 0.3rem; }
+.muted { color: #777; font-size: 0.9rem; }
+.flash { background: #fff6da; border: 1px solid #f0d878; padding: 0.7rem 1rem;
+         border-radius: 6px; margin-bottom: 1rem; }
+.status { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.status-pending { background: #fff2cc; }
+.status-accepted { background: #d9edf7; }
+.status-printing { background: #cfe8ff; }
+.status-ready_for_pickup { background: #d4f7d4; }
+.status-completed { background: #ddd; }
+.status-rejected, .status-cancelled { background: #f7d7d4; }
