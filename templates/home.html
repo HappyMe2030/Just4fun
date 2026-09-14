@@ -1,26 +1,200 @@
+{#
+  Design notes (kept for future passes):
+  Color: --ink #1C2321 (warm charcoal), --bg #EDEFE9 (pale sage-grey, cooler
+    than the cliché warm cream), --accent #E1592A (hot-extruded PLA orange,
+    more saturated/red than a terracotta clay tone), --accent2 #2E6E7E
+    (blueprint teal), --line #D6D2C4.
+  Type: "Space Grotesk" for display/headline (technical, blueprint feel),
+    "IBM Plex Sans" for body (engineering-adjacent, distinct weight).
+  Layout: asymmetric hero, left-aligned copy + right-side SVG of a print
+    literally building up in cross-section layers, bottom to top — the
+    single orchestrated on-load animation, grounded in the actual subject
+    rather than decorative. "How it works" uses numbers because it truly
+    is a 3-step sequence.
+#}
 {% extends "base.html" %}
 {% block content %}
+<style>
+  :root {
+    --ink: #1C2321;
+    --bg: #EDEFE9;
+    --surface: #FFFFFF;
+    --accent: #E1592A;
+    --accent-ink: #8A2E12;
+    --accent2: #2E6E7E;
+    --line: #D6D2C4;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&display=swap');
+
+  body { background: var(--bg); }
+  main { max-width: 1040px; }
+
+  .landing h1, .landing h2, .landing h3 { font-family: 'Space Grotesk', sans-serif; color: var(--ink); }
+  .landing p, .landing a, .landing li { font-family: 'IBM Plex Sans', sans-serif; }
+
+  .hero { display: flex; align-items: center; gap: 2.5rem; padding: 2.5rem 0 3rem; }
+  .hero-copy { flex: 1 1 340px; }
+  .hero-copy h1 { font-size: 2.6rem; line-height: 1.12; font-weight: 700; margin: 0 0 1rem; max-width: 15ch; }
+  .hero-copy p { font-size: 1.08rem; line-height: 1.55; color: #454e4b; max-width: 42ch; margin: 0 0 1.6rem; }
+  .hero-art { flex: 0 0 240px; }
+  .hero-art svg { width: 100%; height: auto; }
+  .layer {
+    fill: var(--accent);
+    opacity: 0;
+    transform-origin: center;
+    animation: rise 0.5s ease-out forwards;
+  }
+  .layer:nth-child(even) { fill: var(--accent2); }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(6px) scaleX(0.9); }
+    to   { opacity: 1; transform: translateY(0) scaleX(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .layer { animation: none; opacity: 1; }
+  }
+
+  .cta-row { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+  .cta-primary, .cta-secondary {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 0.98rem;
+    padding: 0.7rem 1.3rem; border-radius: 6px; text-decoration: none; display: inline-block;
+  }
+  .cta-primary { background: var(--accent); color: white; }
+  .cta-primary:hover { background: var(--accent-ink); }
+  .cta-secondary { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+  .cta-secondary:hover { border-color: var(--ink); }
+
+  .how-it-works { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+                   padding: 2.2rem 0; display: flex; gap: 2rem; flex-wrap: wrap; }
+  .step { flex: 1 1 220px; }
+  .step .num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.85rem;
+               color: var(--accent2); display: block; margin-bottom: 0.4rem; }
+  .step h3 { font-size: 1.05rem; margin: 0 0 0.3rem; }
+  .step p { font-size: 0.92rem; color: #5b625f; margin: 0; line-height: 1.45; }
+
+  .stats { display: flex; gap: 2.5rem; padding: 1.6rem 0; color: #5b625f; font-size: 0.95rem; }
+  .stats strong { font-family: 'Space Grotesk', sans-serif; color: var(--ink); font-size: 1.3rem; display: block; }
+
+  .panels { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .panel { flex: 1 1 260px; background: var(--surface); border: 1px solid var(--line);
+           border-radius: 10px; padding: 1.6rem; }
+  .panel h3 { margin: 0 0 0.4rem; }
+  .panel p { color: #5b625f; font-size: 0.94rem; line-height: 1.5; margin: 0 0 1.1rem; }
+
+  @media (max-width: 700px) {
+    .hero { flex-direction: column; }
+    .hero-art { order: -1; flex: 0 0 auto; max-width: 200px; }
+  }
+</style>
+
+<div class="landing">
   {% if user %}
-    <h1>Hi, {{ user.name or user.email }}</h1>
+    <div class="hero">
+      <div class="hero-copy">
+        <h1>Hi, {{ user.name or user.email }}</h1>
+        <p>Pick up where you left off — browse what's around you or list something new.</p>
+        <div class="cta-row">
+          <a class="cta-primary" href="{{ url_for('list_projects') }}">Browse projects</a>
+          <a class="cta-secondary" href="{{ url_for('list_printers') }}">Browse printers</a>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <svg viewBox="0 0 240 210" xmlns="http://www.w3.org/2000/svg">
+          <rect x="75.0" y="198" width="90" height="10.8" rx="1.5" class="layer" style="animation-delay:0.0s"/>
+          <rect x="70.0" y="186" width="100" height="10.8" rx="1.5" class="layer" style="animation-delay:0.05s"/>
+          <rect x="65.0" y="174" width="110" height="10.8" rx="1.5" class="layer" style="animation-delay:0.1s"/>
+          <rect x="61.0" y="162" width="118" height="10.8" rx="1.5" class="layer" style="animation-delay:0.15s"/>
+          <rect x="59.0" y="150" width="122" height="10.8" rx="1.5" class="layer" style="animation-delay:0.2s"/>
+          <rect x="60.0" y="138" width="120" height="10.8" rx="1.5" class="layer" style="animation-delay:0.25s"/>
+          <rect x="64.0" y="126" width="112" height="10.8" rx="1.5" class="layer" style="animation-delay:0.3s"/>
+          <rect x="70.0" y="114" width="100" height="10.8" rx="1.5" class="layer" style="animation-delay:0.35s"/>
+          <rect x="74.0" y="102" width="92" height="10.8" rx="1.5" class="layer" style="animation-delay:0.4s"/>
+          <rect x="76.0" y="90" width="88" height="10.8" rx="1.5" class="layer" style="animation-delay:0.45s"/>
+          <rect x="72.0" y="78" width="96" height="10.8" rx="1.5" class="layer" style="animation-delay:0.5s"/>
+          <rect x="66.0" y="66" width="108" height="10.8" rx="1.5" class="layer" style="animation-delay:0.55s"/>
+          <rect x="61.0" y="54" width="118" height="10.8" rx="1.5" class="layer" style="animation-delay:0.6s"/>
+          <rect x="59.0" y="42" width="122" height="10.8" rx="1.5" class="layer" style="animation-delay:0.65s"/>
+          <rect x="65.0" y="30" width="110" height="10.8" rx="1.5" class="layer" style="animation-delay:0.7s"/>
+          <rect x="73.0" y="18" width="94" height="10.8" rx="1.5" class="layer" style="animation-delay:0.75s"/>
+        </svg>
+      </div>
+    </div>
+
     {% if not has_location %}
-      <div class="card">
-        <p><strong>Set your location</strong> so we can match you with nearby printers.</p>
-        <a class="btn" href="{{ url_for('profile') }}">Set my location</a>
+      <div class="panels" style="margin-bottom:1.5rem;">
+        <div class="panel">
+          <h3>Set your location</h3>
+          <p>We use it to show you printers and requests nearby.</p>
+          <a class="cta-primary" href="{{ url_for('profile') }}">Set my location</a>
+        </div>
       </div>
     {% endif %}
-    <div class="card">
-      <h3>Browse projects</h3>
-      <p class="muted">Pick a project, find a nearby matching printer, and request a print.</p>
-      <a class="btn" href="{{ url_for('list_projects') }}">View projects</a>
-    </div>
-    <div class="card">
-      <h3>Own a 3D printer?</h3>
-      <p class="muted">List it with its capabilities so people nearby can order prints.</p>
-      <a class="btn" href="{{ url_for('add_printer') }}">Add your printer</a>
+
+    <div class="panels">
+      <div class="panel">
+        <h3>Have something to print?</h3>
+        <p>Post it with the specs it needs, and see who nearby can make it.</p>
+        <a class="cta-secondary" href="{{ url_for('add_project') }}">Post a project</a>
+      </div>
+      <div class="panel">
+        <h3>Own a 3D printer?</h3>
+        <p>List its capabilities so people nearby can order prints from it.</p>
+        <a class="cta-secondary" href="{{ url_for('add_printer') }}">Add your printer</a>
+      </div>
     </div>
   {% else %}
-    <h1>Welcome</h1>
-    <p>Connect 3D printer owners with people who have something to print.</p>
-    <a class="btn" href="{{ url_for('login') }}">Log in / Sign up</a>
+    <div class="hero">
+      <div class="hero-copy">
+        <h1>Something to print. Someone nearby who can print it.</h1>
+        <p>Post a project with what it needs, get matched with a 3D printer close to you, and pick it up once it's ready.</p>
+        <div class="cta-row">
+          <a class="cta-primary" href="{{ url_for('login') }}">Get started</a>
+          <a class="cta-secondary" href="{{ url_for('login') }}">Log in</a>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <svg viewBox="0 0 240 210" xmlns="http://www.w3.org/2000/svg">
+          <rect x="75.0" y="198" width="90" height="10.8" rx="1.5" class="layer" style="animation-delay:0.0s"/>
+          <rect x="70.0" y="186" width="100" height="10.8" rx="1.5" class="layer" style="animation-delay:0.05s"/>
+          <rect x="65.0" y="174" width="110" height="10.8" rx="1.5" class="layer" style="animation-delay:0.1s"/>
+          <rect x="61.0" y="162" width="118" height="10.8" rx="1.5" class="layer" style="animation-delay:0.15s"/>
+          <rect x="59.0" y="150" width="122" height="10.8" rx="1.5" class="layer" style="animation-delay:0.2s"/>
+          <rect x="60.0" y="138" width="120" height="10.8" rx="1.5" class="layer" style="animation-delay:0.25s"/>
+          <rect x="64.0" y="126" width="112" height="10.8" rx="1.5" class="layer" style="animation-delay:0.3s"/>
+          <rect x="70.0" y="114" width="100" height="10.8" rx="1.5" class="layer" style="animation-delay:0.35s"/>
+          <rect x="74.0" y="102" width="92" height="10.8" rx="1.5" class="layer" style="animation-delay:0.4s"/>
+          <rect x="76.0" y="90" width="88" height="10.8" rx="1.5" class="layer" style="animation-delay:0.45s"/>
+          <rect x="72.0" y="78" width="96" height="10.8" rx="1.5" class="layer" style="animation-delay:0.5s"/>
+          <rect x="66.0" y="66" width="108" height="10.8" rx="1.5" class="layer" style="animation-delay:0.55s"/>
+          <rect x="61.0" y="54" width="118" height="10.8" rx="1.5" class="layer" style="animation-delay:0.6s"/>
+          <rect x="59.0" y="42" width="122" height="10.8" rx="1.5" class="layer" style="animation-delay:0.65s"/>
+          <rect x="65.0" y="30" width="110" height="10.8" rx="1.5" class="layer" style="animation-delay:0.7s"/>
+          <rect x="73.0" y="18" width="94" height="10.8" rx="1.5" class="layer" style="animation-delay:0.75s"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="how-it-works">
+      <div class="step">
+        <span class="num">01</span>
+        <h3>Post what you need printed</h3>
+        <p>Technology, material, size, and any other specs it requires.</p>
+      </div>
+      <div class="step">
+        <span class="num">02</span>
+        <h3>Get matched with a nearby printer</h3>
+        <p>We show printers close to you that can handle the job, closest first.</p>
+      </div>
+      <div class="step">
+        <span class="num">03</span>
+        <h3>Pick it up once it's ready</h3>
+        <p>Chat with the owner, track the status, collect it when it's done.</p>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div><strong>{{ printer_count }}</strong> printers listed</div>
+      <div><strong>{{ project_count }}</strong> projects posted</div>
+    </div>
   {% endif %}
+</div>
 {% endblock %}

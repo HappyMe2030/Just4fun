@@ -1,19 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Rate {{ order.printer_name }}</h1>
-<p class="muted">Project: {{ order.project_title }}</p>
-<form method="post" class="card">
-  <label>Rating</label>
-  <select name="rating" required>
-    <option value="" disabled {{ "" if existing else "selected" }}>Choose a rating</option>
-    {% for n in [5,4,3,2,1] %}
-      <option value="{{ n }}" {{ "selected" if existing and existing.rating == n }}>{{ n }} star{{ "s" if n != 1 }}</option>
-    {% endfor %}
-  </select>
+<h1>Rate this order</h1>
+<p class="muted">{{ order.project_title }} — printed on {{ order.printer_name }}</p>
 
-  <label>Comment (optional)</label>
-  <textarea name="comment" rows="4" placeholder="How was the print, communication, pickup...">{{ existing.comment if existing else "" }}</textarea>
+{% for target in targets %}
+  <div class="card">
+    <h3>{{ target.label }}</h3>
+    <form method="post" action="{{ url_for('submit_review', order_id=order.id, target_type=target.type) }}">
+      <label>Rating</label>
+      <select name="rating" required>
+        <option value="" disabled {{ "" if target.existing else "selected" }}>Choose a rating</option>
+        {% for n in [5,4,3,2,1] %}
+          <option value="{{ n }}" {{ "selected" if target.existing and target.existing.rating == n }}>{{ n }} star{{ "s" if n != 1 }}</option>
+        {% endfor %}
+      </select>
 
-  <button type="submit">{{ "Update review" if existing else "Submit review" }}</button>
-</form>
+      <label>Comment (optional)</label>
+      <textarea name="comment" rows="3">{{ target.existing.comment if target.existing else "" }}</textarea>
+
+      <button type="submit">{{ "Update review" if target.existing else "Submit review" }}</button>
+    </form>
+  </div>
+{% endfor %}
+
+<a class="btn secondary" href="{{ url_for('list_orders') }}">Back to orders</a>
 {% endblock %}

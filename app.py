@@ -12,7 +12,7 @@ from flask import (
 import db
 from constants import MATERIALS, NOZZLE_DIAMETERS_MM, TECHNOLOGIES
 from images import InvalidImage, process_image
-from matching import find_nearby_printers, browse_printers
+from matching import find_nearby_printers, browse_printers, get_target_rating
 from tracing import init_tracing
 
 app = Flask(__name__)
@@ -33,6 +33,7 @@ oauth.register(
 )
 
 db.init_db()
+db.seed_demo_data()
 init_tracing(app, db)
 
 
@@ -123,7 +124,16 @@ def logout():
 @app.route("/")
 def home():
     has_location = bool(g.person and g.person["latitude"] is not None)
-    return render_template("home.html", has_location=has_location)
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT COUNT(*) AS cnt FROM printers")
+            printer_count = cur.fetchone()["cnt"]
+            cur.execute("SELECT COUNT(*) AS cnt FROM projects")
+            project_count = cur.fetchone()["cnt"]
+    return render_template(
+        "home.html", has_location=has_location,
+        printer_count=printer_count, project_count=project_count,
+    )
 
 
 @app.route("/profile")
@@ -267,6 +277,41 @@ def edit_printer(printer_id):
     )
 
 
+@app.route("/printers/<int:printer_id>/delete", methods=["POST"])
+@login_required
+def delete_printer(printer_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM printers WHERE id = %s", (printer_id,))
+            printer = cur.fetchone()
+    if not printer:
+        flash("Printer not found.")
+        return redirect(url_for("list_printers"))
+    if printer["owner_id"] != g.person["id"]:
+        flash("You can only delete your own printers.")
+        return redirect(url_for("list_printers"))
+
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM reviews WHERE order_id IN (SELECT id FROM orders WHERE printer_id = %s)",
+                (printer_id,),
+            )
+            cur.execute(
+                "DELETE FROM messages WHERE order_id IN (SELECT id FROM orders WHERE printer_id = %s)",
+                (printer_id,),
+            )
+            cur.execute(
+                "DELETE FROM chat_reads WHERE order_id IN (SELECT id FROM orders WHERE printer_id = %s)",
+                (printer_id,),
+            )
+            cur.execute("DELETE FROM orders WHERE printer_id = %s", (printer_id,))
+            cur.execute("DELETE FROM printers WHERE id = %s", (printer_id,))
+        conn.commit()
+    flash("Printer deleted.")
+    return redirect(url_for("list_printers"))
+
+
 # ---------- projects ----------
 
 @app.route("/projects")
@@ -276,6 +321,8 @@ def list_projects():
         with db.dict_cursor(conn) as cur:
             cur.execute("SELECT * FROM projects ORDER BY created_at DESC")
             projects = cur.fetchall()
+    for p in projects:
+        p["rating"] = get_target_rating("project", p["id"], max_comments=0)
     return render_template("projects_list.html", projects=projects)
 
 
@@ -405,6 +452,41 @@ def edit_project(project_id):
     )
 
 
+@app.route("/projects/<int:project_id>/delete", methods=["POST"])
+@login_required
+def delete_project(project_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
+            project = cur.fetchone()
+    if not project:
+        flash("Project not found.")
+        return redirect(url_for("list_projects"))
+    if project["creator_id"] != g.person["id"]:
+        flash("You can only delete your own projects.")
+        return redirect(url_for("list_projects"))
+
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM reviews WHERE order_id IN (SELECT id FROM orders WHERE project_id = %s)",
+                (project_id,),
+            )
+            cur.execute(
+                "DELETE FROM messages WHERE order_id IN (SELECT id FROM orders WHERE project_id = %s)",
+                (project_id,),
+            )
+            cur.execute(
+                "DELETE FROM chat_reads WHERE order_id IN (SELECT id FROM orders WHERE project_id = %s)",
+                (project_id,),
+            )
+            cur.execute("DELETE FROM orders WHERE project_id = %s", (project_id,))
+            cur.execute("DELETE FROM projects WHERE id = %s", (project_id,))
+        conn.commit()
+    flash("Project deleted.")
+    return redirect(url_for("list_projects"))
+
+
 @app.route("/projects/<int:project_id>/image")
 def project_image(project_id):
     with db.get_conn() as conn:
@@ -437,9 +519,10 @@ def project_detail(project_id):
             project, g.person["latitude"], g.person["longitude"]
         )
     is_owner = project["creator_id"] == g.person["id"]
+    rating = get_target_rating("project", project["id"])
     return render_template(
         "project_detail.html", project=project, printers=printers,
-        has_location=has_location, is_owner=is_owner,
+        has_location=has_location, is_owner=is_owner, rating=rating,
     )
 
 
@@ -533,6 +616,28 @@ def get_order_for_participant(order_id):
     if order["printer_owner_id"] == g.person["id"]:
         return order, "owner"
     return None, None
+
+
+@app.route("/orders/<int:order_id>/delete", methods=["POST"])
+@login_required
+def delete_order(order_id):
+    order, role = get_order_for_participant(order_id)
+    if not order:
+        flash("Order not found.")
+        return redirect(url_for("list_orders"))
+    if role != "requester":
+        flash("Only the person who requested the print can delete this order.")
+        return redirect(url_for("list_orders"))
+
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM reviews WHERE order_id = %s", (order_id,))
+            cur.execute("DELETE FROM messages WHERE order_id = %s", (order_id,))
+            cur.execute("DELETE FROM chat_reads WHERE order_id = %s", (order_id,))
+            cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+        conn.commit()
+    flash("Order deleted.")
+    return redirect(url_for("list_orders"))
 
 
 @app.route("/orders/<int:order_id>/chat")
@@ -644,25 +749,26 @@ def api_unread_count():
     return {"count": count}
 
 
-@app.route("/orders/<int:order_id>/review", methods=["GET", "POST"])
+REVIEW_TARGETS_BY_ROLE = {
+    "requester": ["printer", "project"],
+    "owner": ["customer", "project"],
+}
+
+
+def _review_target_id(order, target_type):
+    return {
+        "printer": order["printer_id"],
+        "project": order["project_id"],
+        "customer": order["requester_id"],
+    }[target_type]
+
+
+@app.route("/orders/<int:order_id>/review")
 @login_required
 def review_order(order_id):
-    with db.get_conn() as conn:
-        with db.dict_cursor(conn) as cur:
-            cur.execute(
-                """
-                SELECT o.*, p.title AS project_title, pr.name AS printer_name
-                FROM orders o
-                JOIN projects p ON p.id = o.project_id
-                JOIN printers pr ON pr.id = o.printer_id
-                WHERE o.id = %s
-                """,
-                (order_id,),
-            )
-            order = cur.fetchone()
-
-    if not order or order["requester_id"] != g.person["id"]:
-        flash("You can only review your own orders.")
+    order, role = get_order_for_participant(order_id)
+    if not order:
+        flash("You don't have access to that order.")
         return redirect(url_for("list_orders"))
     if order["status"] != "completed":
         flash("You can only review an order once it's completed.")
@@ -670,31 +776,61 @@ def review_order(order_id):
 
     with db.get_conn() as conn:
         with db.dict_cursor(conn) as cur:
-            cur.execute("SELECT * FROM reviews WHERE order_id = %s", (order_id,))
-            existing = cur.fetchone()
+            cur.execute(
+                "SELECT * FROM reviews WHERE order_id = %s AND rater_id = %s",
+                (order_id, g.person["id"]),
+            )
+            existing_by_type = {r["target_type"]: r for r in cur.fetchall()}
 
-    if request.method == "POST":
-        rating = int(request.form["rating"])
-        comment = request.form.get("comment", "").strip() or None
-        if rating < 1 or rating > 5:
-            flash("Rating must be between 1 and 5.")
-            return redirect(url_for("review_order", order_id=order_id))
-        with db.get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO reviews (order_id, printer_id, requester_id, rating, comment)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (order_id) DO UPDATE
-                        SET rating = EXCLUDED.rating, comment = EXCLUDED.comment
-                    """,
-                    (order_id, order["printer_id"], g.person["id"], rating, comment),
-                )
-            conn.commit()
-        flash("Thanks for the feedback!")
+    targets = []
+    labels = {
+        "printer": f"Rate the printer ({order['printer_name']})",
+        "project": f"Rate the project ({order['project_title']})",
+        "customer": "Rate the customer",
+    }
+    for target_type in REVIEW_TARGETS_BY_ROLE[role]:
+        targets.append({
+            "type": target_type,
+            "label": labels[target_type],
+            "existing": existing_by_type.get(target_type),
+        })
+
+    return render_template("review_form.html", order=order, targets=targets)
+
+
+@app.route("/orders/<int:order_id>/review/<target_type>", methods=["POST"])
+@login_required
+def submit_review(order_id, target_type):
+    order, role = get_order_for_participant(order_id)
+    if not order:
+        abort(403)
+    if order["status"] != "completed":
+        flash("You can only review an order once it's completed.")
         return redirect(url_for("list_orders"))
+    if target_type not in REVIEW_TARGETS_BY_ROLE.get(role, []):
+        abort(403)
 
-    return render_template("review_form.html", order=order, existing=existing)
+    rating = int(request.form["rating"])
+    comment = request.form.get("comment", "").strip() or None
+    if rating < 1 or rating > 5:
+        flash("Rating must be between 1 and 5.")
+        return redirect(url_for("review_order", order_id=order_id))
+
+    target_id = _review_target_id(order, target_type)
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO reviews (order_id, rater_id, target_type, target_id, rating, comment)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (order_id, rater_id, target_type) DO UPDATE
+                    SET rating = EXCLUDED.rating, comment = EXCLUDED.comment
+                """,
+                (order_id, g.person["id"], target_type, target_id, rating, comment),
+            )
+        conn.commit()
+    flash("Thanks for the feedback!")
+    return redirect(url_for("review_order", order_id=order_id))
 
 
 @app.route("/orders")
@@ -705,12 +841,11 @@ def list_orders():
             cur.execute(
                 """
                 SELECT o.*, p.title AS project_title, pr.name AS printer_name,
-                       pe.name AS owner_name, rv.id AS review_id, rv.rating AS review_rating
+                       pe.name AS owner_name
                 FROM orders o
                 JOIN projects p ON p.id = o.project_id
                 JOIN printers pr ON pr.id = o.printer_id
                 JOIN people pe ON pe.id = pr.owner_id
-                LEFT JOIN reviews rv ON rv.order_id = o.id
                 WHERE o.requester_id = %s
                 ORDER BY o.created_at DESC
                 """,
@@ -732,6 +867,11 @@ def list_orders():
                 (g.person["id"],),
             )
             incoming = cur.fetchall()
+
+    for o in incoming:
+        if o["status"] == "pending":
+            o["requester_rating"] = get_target_rating("customer", o["requester_id"])
+
     return render_template("orders.html", my_requests=my_requests, incoming=incoming)
 
 

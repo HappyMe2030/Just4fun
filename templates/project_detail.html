@@ -5,6 +5,12 @@
   {% if project.image_data %}
     <img src="{{ url_for('project_image', project_id=project.id) }}" alt="" style="max-width:100%; border-radius:6px; margin-bottom:0.8rem;">
   {% endif %}
+  {% if rating.review_count > 0 %}
+    <p>★ {{ rating.avg_rating }}/5 <span class="muted">({{ rating.review_count }} review{{ "s" if rating.review_count != 1 }})</span></p>
+    {% for c in rating.comments %}
+      <p class="muted" style="margin:0.2rem 0;">"{{ c.comment }}" — {{ c.reviewer_name }} ({{ c.rating }}★)</p>
+    {% endfor %}
+  {% endif %}
   <p>{{ project.description or "" }}</p>
   <span class="tag">{{ project.required_technology }}</span>
   {% for m in project.required_materials %}<span class="tag">{{ m }}</span>{% endfor %}
@@ -15,6 +21,10 @@
   </p>
   {% if is_owner %}
     <a class="btn secondary" href="{{ url_for('edit_project', project_id=project.id) }}">Edit project</a>
+    <form method="post" action="{{ url_for('delete_project', project_id=project.id) }}" style="display:inline"
+          onsubmit="return confirm('Delete this project? This also removes its orders, chats, and reviews.');">
+      <button type="submit" class="danger">Delete</button>
+    </form>
   {% endif %}
 </div>
 

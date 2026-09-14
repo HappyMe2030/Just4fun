@@ -102,10 +102,10 @@ def browse_printers(user_lat, user_lng, page=1, per_page=10):
                 FROM printers pr
                 JOIN people pe ON pe.id = pr.owner_id
                 LEFT JOIN (
-                    SELECT printer_id, AVG(rating)::numeric(3,2) AS avg_rating,
+                    SELECT target_id, AVG(rating)::numeric(3,2) AS avg_rating,
                            COUNT(*) AS review_count
-                    FROM reviews GROUP BY printer_id
-                ) rv ON rv.printer_id = pr.id
+                    FROM reviews WHERE target_type = 'printer' GROUP BY target_id
+                ) rv ON rv.target_id = pr.id
                 ORDER BY distance_km ASC
                 LIMIT %(limit)s OFFSET %(offset)s
                 """,
@@ -121,11 +121,12 @@ def browse_printers(user_lat, user_lng, page=1, per_page=10):
             if printer_ids:
                 cur.execute(
                     """
-                    SELECT rv.printer_id, rv.rating, rv.comment, rv.created_at,
+                    SELECT rv.target_id AS printer_id, rv.rating, rv.comment, rv.created_at,
                            pe.name AS reviewer_name
                     FROM reviews rv
-                    JOIN people pe ON pe.id = rv.requester_id
-                    WHERE rv.printer_id = ANY(%s) AND rv.comment IS NOT NULL AND rv.comment != ''
+                    JOIN people pe ON pe.id = rv.rater_id
+                    WHERE rv.target_type = 'printer' AND rv.target_id = ANY(%s)
+                      AND rv.comment IS NOT NULL AND rv.comment != ''
                     ORDER BY rv.created_at DESC
                     """,
                     (printer_ids,),
@@ -139,3 +140,38 @@ def browse_printers(user_lat, user_lng, page=1, per_page=10):
         printer["recent_comments"] = comments_by_printer.get(printer["id"], [])
 
     return printers, total
+
+
+def get_target_rating(target_type, target_id, max_comments=3):
+    """Average rating/count plus a few recent comments for any review
+    target: 'printer', 'project', or 'customer' (target_id = people.id)."""
+    with get_conn() as conn:
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT COALESCE(AVG(rating)::numeric(3,2), 0) AS avg_rating,
+                       COUNT(*) AS review_count
+                FROM reviews WHERE target_type = %s AND target_id = %s
+                """,
+                (target_type, target_id),
+            )
+            agg = cur.fetchone()
+
+            cur.execute(
+                """
+                SELECT rv.rating, rv.comment, rv.created_at, pe.name AS reviewer_name
+                FROM reviews rv
+                JOIN people pe ON pe.id = rv.rater_id
+                WHERE rv.target_type = %s AND rv.target_id = %s
+                  AND rv.comment IS NOT NULL AND rv.comment != ''
+                ORDER BY rv.created_at DESC
+                LIMIT %s
+                """,
+                (target_type, target_id, max_comments),
+            )
+            comments = cur.fetchall()
+
+    return {
+        "avg_rating": agg["avg_rating"], "review_count": agg["review_count"],
+        "comments": comments,
+    }

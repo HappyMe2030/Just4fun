@@ -5,25 +5,26 @@
 <h2>Requests you've made</h2>
 {% for o in my_requests %}
   <div class="card">
-    <h3>{{ o.project_title }} <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
+    <h3><a href="{{ url_for('project_detail', project_id=o.project_id) }}">{{ o.project_title }}</a>
+      <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
     <p class="muted">Printer: {{ o.printer_name }} (owner: {{ o.owner_name }})</p>
     <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat</a>
     {% if o.status == 'ready_for_pickup' %}
       <p><strong>Ready for pickup</strong> at the printer's location.</p>
-      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='completed') }}">
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='completed') }}" style="display:inline">
         <button type="submit">Mark picked up</button>
       </form>
     {% elif o.status == 'pending' %}
-      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='cancelled') }}">
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='cancelled') }}" style="display:inline">
         <button type="submit" class="secondary">Cancel request</button>
       </form>
     {% elif o.status == 'completed' %}
-      {% if o.review_id %}
-        <p class="muted">You rated this printer {{ o.review_rating }}/5. <a href="{{ url_for('review_order', order_id=o.id) }}">Edit review</a></p>
-      {% else %}
-        <a class="btn" href="{{ url_for('review_order', order_id=o.id) }}">Leave a review</a>
-      {% endif %}
+      <a class="btn" href="{{ url_for('review_order', order_id=o.id) }}">Rate & review</a>
     {% endif %}
+    <form method="post" action="{{ url_for('delete_order', order_id=o.id) }}" style="display:inline"
+          onsubmit="return confirm('Delete this order? This also removes its chat and reviews.');">
+      <button type="submit" class="danger">Delete</button>
+    </form>
   </div>
 {% else %}
   <p class="muted">You haven't requested any prints yet.</p>
@@ -32,8 +33,16 @@
 <h2>Requests for your printers</h2>
 {% for o in incoming %}
   <div class="card">
-    <h3>{{ o.project_title }} <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
+    <h3><a href="{{ url_for('project_detail', project_id=o.project_id) }}">{{ o.project_title }}</a>
+      <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
     <p class="muted">Printer: {{ o.printer_name }} · Requested by: {{ o.requester_name }}</p>
+    {% if o.status == 'pending' and o.requester_rating %}
+      {% if o.requester_rating.review_count > 0 %}
+        <p class="muted">Customer rating: ★ {{ o.requester_rating.avg_rating }}/5 ({{ o.requester_rating.review_count }} review{{ "s" if o.requester_rating.review_count != 1 }})</p>
+      {% else %}
+        <p class="muted">Customer has no prior reviews yet.</p>
+      {% endif %}
+    {% endif %}
     <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat with requester</a>
     {% if o.status == 'pending' %}
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='accepted') }}" style="display:inline">
@@ -43,13 +52,15 @@
         <button type="submit" class="danger">Reject</button>
       </form>
     {% elif o.status == 'accepted' %}
-      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='printing') }}">
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='printing') }}" style="display:inline">
         <button type="submit">Start printing</button>
       </form>
     {% elif o.status == 'printing' %}
-      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='ready_for_pickup') }}">
+      <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='ready_for_pickup') }}" style="display:inline">
         <button type="submit">Mark ready for pickup</button>
       </form>
+    {% elif o.status == 'completed' %}
+      <a class="btn" href="{{ url_for('review_order', order_id=o.id) }}">Rate & review</a>
     {% endif %}
   </div>
 {% else %}
