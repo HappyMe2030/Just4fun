@@ -49,11 +49,65 @@
     <label><input type="checkbox" name="enclosed" {{ "checked" if printer and printer.enclosed }}> Enclosed chamber</label>
   </div>
 
-  <label>Latitude</label>
-  <input type="text" name="latitude" value="{{ printer.latitude if printer else (person.latitude or '') }}" required>
-  <label>Longitude</label>
-  <input type="text" name="longitude" value="{{ printer.longitude if printer else (person.longitude or '') }}" required>
+  <label>Address</label>
+  <input type="text" name="address" id="address-field" placeholder="e.g. 123 Main St, Springfield"
+         value="{{ printer.address if printer else (person.address or '') }}">
+  <button type="button" id="geocode-btn" class="secondary">Find this address</button>
+  <button type="button" id="locate-btn" class="secondary">Use my current location instead</button>
+  <p id="geocode-status" class="muted"></p>
+
+  <input type="hidden" name="latitude" id="lat-field" value="{{ printer.latitude if printer else (person.latitude or '') }}">
+  <input type="hidden" name="longitude" id="lng-field" value="{{ printer.longitude if printer else (person.longitude or '') }}">
 
   <button type="submit">{{ "Save changes" if printer else "Add printer" }}</button>
 </form>
+
+<script>
+const statusEl = document.getElementById('geocode-status');
+const latField = document.getElementById('lat-field');
+const lngField = document.getElementById('lng-field');
+const addressField = document.getElementById('address-field');
+
+document.getElementById('geocode-btn').addEventListener('click', async function () {
+  const address = addressField.value.trim();
+  if (!address) { statusEl.textContent = 'Enter an address first.'; return; }
+  statusEl.textContent = 'Looking up address…';
+  try {
+    const res = await fetch('/geocode?address=' + encodeURIComponent(address));
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      statusEl.textContent = data.error || 'Could not find that address.';
+      return;
+    }
+    latField.value = data.lat;
+    lngField.value = data.lng;
+    statusEl.textContent = 'Found: ' + data.display_name;
+  } catch (e) {
+    statusEl.textContent = 'Something went wrong looking up that address.';
+  }
+});
+
+document.getElementById('locate-btn').addEventListener('click', function () {
+  if (!navigator.geolocation) {
+    statusEl.textContent = 'Geolocation is not supported by your browser.';
+    return;
+  }
+  statusEl.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(function (pos) {
+    latField.value = pos.coords.latitude;
+    lngField.value = pos.coords.longitude;
+    addressField.value = '';
+    statusEl.textContent = 'Location found.';
+  }, function (err) {
+    statusEl.textContent = 'Could not get location: ' + err.message;
+  });
+});
+
+document.querySelector('form').addEventListener('submit', function (e) {
+  if (!latField.value || !lngField.value) {
+    e.preventDefault();
+    statusEl.textContent = 'Find an address or use your current location first.';
+  }
+});
+</script>
 {% endblock %}

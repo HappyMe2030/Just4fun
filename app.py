@@ -3,6 +3,7 @@ from functools import wraps
 from urllib.parse import quote_plus, urlencode
 
 import psycopg2
+import requests
 from authlib.integrations.flask_client import OAuth
 from flask import (
     Flask, Response, abort, flash, g, redirect, render_template, request,
@@ -166,15 +167,48 @@ def profile():
 def update_location():
     lat = float(request.form["latitude"])
     lng = float(request.form["longitude"])
+    address = request.form.get("address", "").strip() or None
     with db.get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE people SET latitude = %s, longitude = %s WHERE id = %s",
-                (lat, lng, g.person["id"]),
+                "UPDATE people SET latitude = %s, longitude = %s, address = %s WHERE id = %s",
+                (lat, lng, address, g.person["id"]),
             )
         conn.commit()
     flash("Location updated.")
     return redirect(url_for("profile"))
+
+
+NOMINATIM_USER_AGENT = os.environ.get(
+    "NOMINATIM_USER_AGENT", "3DPrintMarketplace/1.0 (contact not configured)"
+)
+
+
+@app.route("/geocode")
+@login_required
+def geocode():
+    address = request.args.get("address", "").strip()
+    if not address:
+        return {"error": "Enter an address first."}, 400
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": address, "format": "json", "limit": 1},
+            headers={"User-Agent": NOMINATIM_USER_AGENT},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        results = resp.json()
+    except Exception as e:
+        app.logger.warning("geocode failed: %s", e)
+        return {"error": "Couldn't reach the geocoding service. Try again."}, 502
+    if not results:
+        return {"error": "No location found for that address."}, 404
+    top = results[0]
+    return {
+        "lat": float(top["lat"]), "lng": float(top["lon"]),
+        "display_name": top["display_name"],
+    }
 
 
 # ---------- printers ----------
@@ -214,19 +248,20 @@ def add_printer():
         materials = request.form.getlist("materials")
         nozzle = f.get("nozzle_diameter_mm") or None
         max_temp = f.get("max_nozzle_temp_c") or None
+        address = f.get("address", "").strip() or None
         with db.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     INSERT INTO printers (
-                        owner_id, name, description, latitude, longitude,
+                        owner_id, name, description, address, latitude, longitude,
                         technology, materials, nozzle_diameter_mm,
                         build_volume_x_mm, build_volume_y_mm, build_volume_z_mm,
                         heated_bed, enclosed, max_nozzle_temp_c
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
-                        g.person["id"], f["name"], f.get("description"),
+                        g.person["id"], f["name"], f.get("description"), address,
                         float(f["latitude"]), float(f["longitude"]),
                         f["technology"], materials, nozzle,
                         int(f["build_volume_x_mm"]), int(f["build_volume_y_mm"]),
@@ -264,19 +299,20 @@ def edit_printer(printer_id):
         materials = request.form.getlist("materials")
         nozzle = f.get("nozzle_diameter_mm") or None
         max_temp = f.get("max_nozzle_temp_c") or None
+        address = f.get("address", "").strip() or None
         with db.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     UPDATE printers SET
-                        name=%s, description=%s, latitude=%s, longitude=%s,
+                        name=%s, description=%s, address=%s, latitude=%s, longitude=%s,
                         technology=%s, materials=%s, nozzle_diameter_mm=%s,
                         build_volume_x_mm=%s, build_volume_y_mm=%s, build_volume_z_mm=%s,
                         heated_bed=%s, enclosed=%s, max_nozzle_temp_c=%s
                     WHERE id = %s
                     """,
                     (
-                        f["name"], f.get("description"),
+                        f["name"], f.get("description"), address,
                         float(f["latitude"]), float(f["longitude"]),
                         f["technology"], materials, nozzle,
                         int(f["build_volume_x_mm"]), int(f["build_volume_y_mm"]),

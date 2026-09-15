@@ -55,6 +55,7 @@ def init_db():
             cur.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
             cur.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION")
             cur.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS picture TEXT")
+            cur.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS address TEXT")
 
             cur.execute(
                 """
@@ -74,6 +75,7 @@ def init_db():
                     owner_id INTEGER NOT NULL REFERENCES people(id),
                     name TEXT NOT NULL,
                     description TEXT,
+                    address TEXT,
                     latitude DOUBLE PRECISION NOT NULL,
                     longitude DOUBLE PRECISION NOT NULL,
                     technology TEXT NOT NULL,
@@ -89,6 +91,7 @@ def init_db():
                 )
                 """
             )
+            cur.execute("ALTER TABLE printers ADD COLUMN IF NOT EXISTS address TEXT")
 
             # --- projects ---
             cur.execute(
@@ -230,36 +233,39 @@ def seed_demo_data():
                 (
                     "DEMO_NOT_USE Amsterdam FDM Pro",
                     "Reliable everyday FDM printer, centrally located.",
+                    "Dam, 1012 Amsterdam, Netherlands",
                     52.3702, 4.8952, "FDM", ["PLA", "PETG", "ABS"], 0.4,
                     250, 210, 220, True, False, 260,
                 ),
                 (
                     "DEMO_NOT_USE Haarlem Mini",
                     "Compact FDM printer, great for small parts.",
+                    "Grote Markt, Haarlem, Netherlands",
                     52.3874, 4.6462, "FDM", ["PLA", "TPU"], 0.4,
                     180, 180, 180, False, False, 240,
                 ),
                 (
                     "DEMO_NOT_USE Utrecht Resin Master",
                     "High-detail SLA resin printing for miniatures.",
+                    "Domplein, Utrecht, Netherlands",
                     52.0907, 5.1214, "SLA", ["RESIN_STANDARD", "RESIN_TOUGH"], None,
                     145, 145, 175, False, True, None,
                 ),
             ]
             printer_ids = []
-            for (name, desc, lat, lng, tech, materials, nozzle,
+            for (name, desc, address, lat, lng, tech, materials, nozzle,
                  bx, by, bz, bed, enc, temp) in printers:
                 cur.execute(
                     """
                     INSERT INTO printers (
-                        owner_id, name, description, latitude, longitude,
+                        owner_id, name, description, address, latitude, longitude,
                         technology, materials, nozzle_diameter_mm,
                         build_volume_x_mm, build_volume_y_mm, build_volume_z_mm,
                         heated_bed, enclosed, max_nozzle_temp_c
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     RETURNING id
                     """,
-                    (owner_id, name, desc, lat, lng, tech, materials, nozzle,
+                    (owner_id, name, desc, address, lat, lng, tech, materials, nozzle,
                      bx, by, bz, bed, enc, temp),
                 )
                 printer_ids.append(cur.fetchone()["id"])
