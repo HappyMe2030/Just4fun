@@ -16,7 +16,11 @@
               padding:0 6px; font-size:0.75rem; display:none; margin-left:0.2rem;"></span>
       </a>
       <a href="{{ url_for('profile') }}">Profile</a>
-      <a href="{{ url_for('logout') }}" class="right">Log out ({{ user.name or user.email }})</a>
+      <a href="{{ url_for('logout') }}" class="right" style="display:flex; align-items:center; gap:0.5rem;">
+        <img src="{{ avatar_url(user.name or user.email, user.picture, 32) }}" alt=""
+             style="width:24px; height:24px; border-radius:50%; object-fit:cover;">
+        Log out ({{ user.name or user.email }})
+      </a>
     {% else %}
       <a href="{{ url_for('login') }}" class="right">Log in / Sign up</a>
     {% endif %}

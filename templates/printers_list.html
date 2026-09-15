@@ -34,7 +34,11 @@
   {% for pr in nearby_printers %}
     <div class="card">
       <h3>{{ pr.name }} <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
-      <p class="muted">Owner: {{ pr.owner_name }}</p>
+      <p class="muted" style="display:flex; align-items:center; gap:0.4rem;">
+        <img src="{{ avatar_url(pr.owner_name, pr.owner_picture, 40) }}" alt=""
+             style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
+        Owner: {{ pr.owner_name }}
+      </p>
       <span class="tag">{{ pr.technology }}</span>
       {% for m in pr.materials %}<span class="tag">{{ m }}</span>{% endfor %}
       <p class="muted">Build volume: {{ pr.build_volume_x_mm }} × {{ pr.build_volume_y_mm }} × {{ pr.build_volume_z_mm }} mm</p>

@@ -8,6 +8,11 @@
       <img src="{{ url_for('project_image', project_id=p.id) }}" alt="" style="max-width:160px; float:right; border-radius:6px; margin-left:1rem;">
     {% endif %}
     <h3><a href="{{ url_for('project_detail', project_id=p.id) }}">{{ p.title }}</a></h3>
+    <p class="muted" style="display:flex; align-items:center; gap:0.4rem;">
+      <img src="{{ avatar_url(p.creator_name, p.creator_picture, 40) }}" alt=""
+           style="width:20px; height:20px; border-radius:50%; object-fit:cover;">
+      {{ p.creator_name }}
+    </p>
     {% if p.rating.review_count > 0 %}
       <p class="muted">★ {{ p.rating.avg_rating }}/5 ({{ p.rating.review_count }} review{{ "s" if p.rating.review_count != 1 }})</p>
     {% endif %}

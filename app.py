@@ -8,7 +8,6 @@ from flask import (
     Flask, Response, abort, flash, g, redirect, render_template, request,
     session, url_for,
 )
-
 import db
 from constants import MATERIALS, NOZZLE_DIAMETERS_MM, TECHNOLOGIES
 from images import InvalidImage, process_image
@@ -37,20 +36,39 @@ db.seed_demo_data()
 init_tracing(app, db)
 
 
+def avatar_url(name, picture=None, size=64):
+    """A real profile photo (from Auth0) when we have one, otherwise a
+    generated initials avatar so every user/printer/project always shows
+    something, including seeded demo accounts with no Auth0 login."""
+    if picture:
+        return picture
+    return (
+        "https://ui-avatars.com/api/?"
+        + urlencode({
+            "name": name or "?", "background": "1C2321", "color": "EDEFE9",
+            "size": size, "rounded": "true", "bold": "true",
+        })
+    )
+
+
+app.jinja_env.globals["avatar_url"] = avatar_url
+
+
 # ---------- auth helpers ----------
 
-def get_or_create_person(sub, name, email):
+def get_or_create_person(sub, name, email, picture=None):
     with db.get_conn() as conn:
         with db.dict_cursor(conn) as cur:
             cur.execute(
                 """
-                INSERT INTO people (auth0_sub, name, email)
-                VALUES (%s, %s, %s)
+                INSERT INTO people (auth0_sub, name, email, picture)
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (auth0_sub) DO UPDATE
-                    SET name = EXCLUDED.name, email = EXCLUDED.email
+                    SET name = EXCLUDED.name, email = EXCLUDED.email,
+                        picture = EXCLUDED.picture
                 RETURNING *
                 """,
-                (sub, name, email),
+                (sub, name, email, picture),
             )
             person = cur.fetchone()
             cur.execute(
@@ -102,7 +120,8 @@ def callback():
     userinfo = token["userinfo"]
     session["user"] = userinfo
     get_or_create_person(
-        sub=userinfo["sub"], name=userinfo.get("name"), email=userinfo.get("email")
+        sub=userinfo["sub"], name=userinfo.get("name"), email=userinfo.get("email"),
+        picture=userinfo.get("picture"),
     )
     return redirect(url_for("home"))
 
@@ -319,7 +338,14 @@ def delete_printer(printer_id):
 def list_projects():
     with db.get_conn() as conn:
         with db.dict_cursor(conn) as cur:
-            cur.execute("SELECT * FROM projects ORDER BY created_at DESC")
+            cur.execute(
+                """
+                SELECT p.*, pe.name AS creator_name, pe.picture AS creator_picture
+                FROM projects p
+                JOIN people pe ON pe.id = p.creator_id
+                ORDER BY p.created_at DESC
+                """
+            )
             projects = cur.fetchall()
     for p in projects:
         p["rating"] = get_target_rating("project", p["id"], max_comments=0)
@@ -506,7 +532,15 @@ def project_image(project_id):
 def project_detail(project_id):
     with db.get_conn() as conn:
         with db.dict_cursor(conn) as cur:
-            cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
+            cur.execute(
+                """
+                SELECT p.*, pe.name AS creator_name, pe.picture AS creator_picture
+                FROM projects p
+                JOIN people pe ON pe.id = p.creator_id
+                WHERE p.id = %s
+                """,
+                (project_id,),
+            )
             project = cur.fetchone()
     if not project:
         flash("Project not found.")

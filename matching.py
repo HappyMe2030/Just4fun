@@ -64,7 +64,8 @@ def find_nearby_printers(project, user_lat, user_lng, radius_km=200):
     """All printers within radius_km of (user_lat, user_lng), closest first,
     each annotated with distance_km and mismatch_reasons (empty = full match)."""
     sql = f"""
-        SELECT pr.*, {HAVERSINE_KM} AS distance_km, pe.name AS owner_name
+        SELECT pr.*, {HAVERSINE_KM} AS distance_km, pe.name AS owner_name,
+               pe.picture AS owner_picture
         FROM printers pr
         JOIN people pe ON pe.id = pr.owner_id
         WHERE {HAVERSINE_KM} <= %(radius)s
@@ -97,6 +98,7 @@ def browse_printers(user_lat, user_lng, page=1, per_page=10):
             cur.execute(
                 f"""
                 SELECT pr.*, {HAVERSINE_KM} AS distance_km, pe.name AS owner_name,
+                       pe.picture AS owner_picture,
                        COALESCE(rv.avg_rating, 0) AS avg_rating,
                        COALESCE(rv.review_count, 0) AS review_count
                 FROM printers pr

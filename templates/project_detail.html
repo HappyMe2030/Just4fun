@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>{{ project.title }}</h1>
+<p class="muted" style="display:flex; align-items:center; gap:0.4rem; margin-top:-0.5rem;">
+  <img src="{{ avatar_url(project.creator_name, project.creator_picture, 40) }}" alt=""
+       style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
+  Posted by {{ project.creator_name }}
+</p>
 <div class="card">
   {% if project.image_data %}
     <img src="{{ url_for('project_image', project_id=project.id) }}" alt="" style="max-width:100%; border-radius:6px; margin-bottom:0.8rem;">
@@ -35,7 +40,11 @@
   {% for pr in printers %}
     <div class="card">
       <h3>{{ pr.name }} <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
-      <p class="muted">Owner: {{ pr.owner_name }}</p>
+      <p class="muted" style="display:flex; align-items:center; gap:0.4rem;">
+        <img src="{{ avatar_url(pr.owner_name, pr.owner_picture, 40) }}" alt=""
+             style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
+        Owner: {{ pr.owner_name }}
+      </p>
       <span class="tag">{{ pr.technology }}</span>
       {% for m in pr.materials %}<span class="tag">{{ m }}</span>{% endfor %}
       <p class="muted">Build volume: {{ pr.build_volume_x_mm }} × {{ pr.build_volume_y_mm }} × {{ pr.build_volume_z_mm }} mm</p>

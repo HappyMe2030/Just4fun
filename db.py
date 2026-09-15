@@ -1,8 +1,21 @@
+import base64
 import os
+
 import psycopg2
 import psycopg2.extras
 
 DATABASE_URL = os.environ["DATABASE_URL"]
+DEMO_ASSETS_DIR = os.path.join(os.path.dirname(__file__), "demo_assets")
+
+
+def _load_demo_image(filename):
+    """Reads a pre-baked base64-encoded JPEG from demo_assets/ and returns
+    raw bytes. Baked ahead of time (not generated at runtime) since the
+    production server may not have any font files installed for PIL to
+    draw text with."""
+    path = os.path.join(DEMO_ASSETS_DIR, filename)
+    with open(path, "r") as f:
+        return base64.b64decode(f.read().strip())
 
 
 def get_conn():
@@ -31,6 +44,7 @@ def init_db():
                     auth0_sub TEXT UNIQUE NOT NULL,
                     name TEXT,
                     email TEXT,
+                    picture TEXT,
                     latitude DOUBLE PRECISION,
                     longitude DOUBLE PRECISION,
                     first_login TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -40,6 +54,7 @@ def init_db():
             # additive, safe even if the table already existed
             cur.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
             cur.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION")
+            cur.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS picture TEXT")
 
             cur.execute(
                 """
@@ -254,21 +269,25 @@ def seed_demo_data():
                     "DEMO_NOT_USE Articulated Dragon Toy",
                     "A fun flexible-jointed dragon print, no supports needed.",
                     "FDM", ["PLA", "PETG"], 150, 80, 60, 0.4, False, False,
+                    "dragon.b64",
                 ),
                 (
                     "DEMO_NOT_USE Phone Stand",
                     "Simple adjustable phone stand.",
                     "FDM", ["PLA"], 100, 100, 80, None, False, False,
+                    "phonestand.b64",
                 ),
                 (
                     "DEMO_NOT_USE Miniature Figurine",
                     "High-detail 32mm tabletop miniature.",
                     "SLA", ["RESIN_STANDARD"], 60, 60, 100, None, False, True,
+                    "figurine.b64",
                 ),
             ]
             project_ids = []
             for (title, desc, tech, materials, bx, by, bz,
-                 nozzle, bed, enc) in projects:
+                 nozzle, bed, enc, image_file) in projects:
+                image_data = psycopg2.Binary(_load_demo_image(image_file))
                 cur.execute(
                     """
                     INSERT INTO projects (
@@ -276,12 +295,12 @@ def seed_demo_data():
                         required_materials, required_build_volume_x_mm,
                         required_build_volume_y_mm, required_build_volume_z_mm,
                         required_nozzle_diameter_max_mm, required_heated_bed,
-                        required_enclosed
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        required_enclosed, image_data, image_mime
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     RETURNING id
                     """,
                     (creator_id, title, desc, tech, materials, bx, by, bz,
-                     nozzle, bed, enc),
+                     nozzle, bed, enc, image_data, "image/jpeg"),
                 )
                 project_ids.append(cur.fetchone()["id"])
 

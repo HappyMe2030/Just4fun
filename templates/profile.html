@@ -2,6 +2,8 @@
 {% block content %}
 <h1>Your profile</h1>
 <div class="card">
+  <img src="{{ avatar_url(user.name or user.email, user.picture, 96) }}" alt=""
+       style="width:72px; height:72px; border-radius:50%; object-fit:cover; float:right;">
   <p><strong>Name:</strong> {{ user.name or "—" }}</p>
   <p><strong>Email:</strong> {{ user.email or "—" }}</p>
   <p><strong>Location:</strong>
