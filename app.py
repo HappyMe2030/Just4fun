@@ -973,6 +973,11 @@ def list_orders():
             )
             unread_by_order = {r["order_id"]: r["cnt"] for r in cur.fetchall()}
 
+            cur.execute(
+                "SELECT 1 FROM printers WHERE owner_id = %s LIMIT 1", (g.person["id"],)
+            )
+            has_printers = cur.fetchone() is not None
+
     for o in my_requests:
         o["unread_count"] = unread_by_order.get(o["id"], 0)
     for o in incoming:
@@ -980,7 +985,10 @@ def list_orders():
         if o["status"] == "pending":
             o["requester_rating"] = get_target_rating("customer", o["requester_id"])
 
-    return render_template("orders.html", my_requests=my_requests, incoming=incoming)
+    return render_template(
+        "orders.html", my_requests=my_requests, incoming=incoming,
+        has_printers=has_printers,
+    )
 
 
 if __name__ == "__main__":
