@@ -58,6 +58,9 @@ async function poll() {
     const res = await fetch(`/orders/${orderId}/messages.json`);
     if (res.ok) render((await res.json()).messages);
   } catch (e) { /* ignore transient errors, retry on next tick */ }
+  // keepalive so this still completes even if the page is navigated away
+  // from right after this fires (e.g. clicking "Back to orders" quickly)
+  fetch(`/orders/${orderId}/mark_read`, { method: 'POST', keepalive: true }).catch(() => {});
 }
 
 form.addEventListener('submit', async function (e) {
@@ -76,5 +79,11 @@ form.addEventListener('submit', async function (e) {
 
 poll();
 setInterval(poll, 3000);
+
+// belt-and-suspenders: sendBeacon is purpose-built for "still send this even
+// though the page is closing" and works even in cases keepalive fetch might not
+window.addEventListener('pagehide', function () {
+  navigator.sendBeacon(`/orders/${orderId}/mark_read`);
+});
 </script>
 {% endblock %}
