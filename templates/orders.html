@@ -8,7 +8,9 @@
     <h3><a href="{{ url_for('project_detail', project_id=o.project_id) }}">{{ o.project_title }}</a>
       <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
     <p class="muted">Printer: {{ o.printer_name }} (owner: {{ o.owner_name }})</p>
-    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat</a>
+    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat
+      {% if o.unread_count > 0 %}<span class="tag" style="background:#e53935; color:white;">{{ o.unread_count }} new</span>{% endif %}
+    </a>
     {% if o.status == 'ready_for_pickup' %}
       <p><strong>Ready for pickup</strong> at the printer's location.</p>
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='completed') }}" style="display:inline">
@@ -43,7 +45,9 @@
         <p class="muted">Customer has no prior reviews yet.</p>
       {% endif %}
     {% endif %}
-    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat with requester</a>
+    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat with requester
+      {% if o.unread_count > 0 %}<span class="tag" style="background:#e53935; color:white;">{{ o.unread_count }} new</span>{% endif %}
+    </a>
     {% if o.status == 'pending' %}
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='accepted') }}" style="display:inline">
         <button type="submit">Accept</button>

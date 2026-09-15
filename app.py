@@ -610,11 +610,14 @@ def order_transition(order_id, new_status):
                 flash("Order not found.")
                 return redirect(url_for("list_orders"))
 
-            role = "owner" if order["printer_owner_id"] == g.person["id"] else (
-                "requester" if order["requester_id"] == g.person["id"] else None
-            )
+            is_requester = order["requester_id"] == g.person["id"]
+            is_owner = order["printer_owner_id"] == g.person["id"]
             allowed_role = VALID_TRANSITIONS.get((order["status"], new_status))
-            if role is None or allowed_role != role:
+            has_permission = (
+                (allowed_role == "owner" and is_owner)
+                or (allowed_role == "requester" and is_requester)
+            )
+            if not has_permission:
                 flash("You can't perform that action on this order.")
                 return redirect(url_for("list_orders"))
 
@@ -627,8 +630,10 @@ def order_transition(order_id, new_status):
 
 
 def get_order_for_participant(order_id):
-    """Loads an order, returning (order, role) if the current person is the
-    requester or the printer's owner, otherwise (None, None)."""
+    """Loads an order, returning (order, roles) where roles is the subset of
+    {"requester", "owner"} the current person actually holds on this order —
+    both, if they ordered their own project from their own printer. Returns
+    (None, set()) if they're not a participant at all."""
     with db.get_conn() as conn:
         with db.dict_cursor(conn) as cur:
             cur.execute(
@@ -644,22 +649,25 @@ def get_order_for_participant(order_id):
             )
             order = cur.fetchone()
     if not order:
-        return None, None
+        return None, set()
+    roles = set()
     if order["requester_id"] == g.person["id"]:
-        return order, "requester"
+        roles.add("requester")
     if order["printer_owner_id"] == g.person["id"]:
-        return order, "owner"
-    return None, None
+        roles.add("owner")
+    if not roles:
+        return None, set()
+    return order, roles
 
 
 @app.route("/orders/<int:order_id>/delete", methods=["POST"])
 @login_required
 def delete_order(order_id):
-    order, role = get_order_for_participant(order_id)
+    order, roles = get_order_for_participant(order_id)
     if not order:
         flash("Order not found.")
         return redirect(url_for("list_orders"))
-    if role != "requester":
+    if "requester" not in roles:
         flash("Only the person who requested the print can delete this order.")
         return redirect(url_for("list_orders"))
 
@@ -677,17 +685,17 @@ def delete_order(order_id):
 @app.route("/orders/<int:order_id>/chat")
 @login_required
 def order_chat(order_id):
-    order, role = get_order_for_participant(order_id)
+    order, roles = get_order_for_participant(order_id)
     if not order:
         flash("You don't have access to that order's chat.")
         return redirect(url_for("list_orders"))
-    return render_template("chat.html", order=order, role=role)
+    return render_template("chat.html", order=order, roles=roles)
 
 
 @app.route("/orders/<int:order_id>/messages.json")
 @login_required
 def order_messages(order_id):
-    order, role = get_order_for_participant(order_id)
+    order, roles = get_order_for_participant(order_id)
     if not order:
         abort(403)
     with db.get_conn() as conn:
@@ -720,7 +728,7 @@ def order_messages(order_id):
 @app.route("/orders/<int:order_id>/messages", methods=["POST"])
 @login_required
 def send_message(order_id):
-    order, role = get_order_for_participant(order_id)
+    order, roles = get_order_for_participant(order_id)
     if not order:
         abort(403)
     if request.is_json:
@@ -743,7 +751,7 @@ def send_message(order_id):
 @app.route("/orders/<int:order_id>/mark_read", methods=["POST"])
 @login_required
 def mark_read(order_id):
-    order, role = get_order_for_participant(order_id)
+    order, roles = get_order_for_participant(order_id)
     if not order:
         abort(403)
     with db.get_conn() as conn:
@@ -800,7 +808,7 @@ def _review_target_id(order, target_type):
 @app.route("/orders/<int:order_id>/review")
 @login_required
 def review_order(order_id):
-    order, role = get_order_for_participant(order_id)
+    order, roles = get_order_for_participant(order_id)
     if not order:
         flash("You don't have access to that order.")
         return redirect(url_for("list_orders"))
@@ -816,13 +824,20 @@ def review_order(order_id):
             )
             existing_by_type = {r["target_type"]: r for r in cur.fetchall()}
 
+    target_types = []
+    for role in ("requester", "owner"):
+        if role in roles:
+            for t in REVIEW_TARGETS_BY_ROLE[role]:
+                if t not in target_types:
+                    target_types.append(t)
+
     targets = []
     labels = {
         "printer": f"Rate the printer ({order['printer_name']})",
         "project": f"Rate the project ({order['project_title']})",
         "customer": "Rate the customer",
     }
-    for target_type in REVIEW_TARGETS_BY_ROLE[role]:
+    for target_type in target_types:
         targets.append({
             "type": target_type,
             "label": labels[target_type],
@@ -835,13 +850,16 @@ def review_order(order_id):
 @app.route("/orders/<int:order_id>/review/<target_type>", methods=["POST"])
 @login_required
 def submit_review(order_id, target_type):
-    order, role = get_order_for_participant(order_id)
+    order, roles = get_order_for_participant(order_id)
     if not order:
         abort(403)
     if order["status"] != "completed":
         flash("You can only review an order once it's completed.")
         return redirect(url_for("list_orders"))
-    if target_type not in REVIEW_TARGETS_BY_ROLE.get(role, []):
+    allowed_types = set()
+    for role in roles:
+        allowed_types.update(REVIEW_TARGETS_BY_ROLE[role])
+    if target_type not in allowed_types:
         abort(403)
 
     rating = int(request.form["rating"])
@@ -902,7 +920,27 @@ def list_orders():
             )
             incoming = cur.fetchall()
 
+            cur.execute(
+                """
+                SELECT o.id AS order_id, COUNT(*) AS cnt
+                FROM messages m
+                JOIN orders o ON o.id = m.order_id
+                JOIN printers pr ON pr.id = o.printer_id
+                LEFT JOIN chat_reads cr
+                    ON cr.order_id = o.id AND cr.person_id = %(pid)s
+                WHERE (o.requester_id = %(pid)s OR pr.owner_id = %(pid)s)
+                  AND m.sender_id != %(pid)s
+                  AND m.created_at > COALESCE(cr.last_read_at, '-infinity'::timestamptz)
+                GROUP BY o.id
+                """,
+                {"pid": g.person["id"]},
+            )
+            unread_by_order = {r["order_id"]: r["cnt"] for r in cur.fetchall()}
+
+    for o in my_requests:
+        o["unread_count"] = unread_by_order.get(o["id"], 0)
     for o in incoming:
+        o["unread_count"] = unread_by_order.get(o["id"], 0)
         if o["status"] == "pending":
             o["requester_rating"] = get_target_rating("customer", o["requester_id"])
 
