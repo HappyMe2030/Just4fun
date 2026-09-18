@@ -3,14 +3,32 @@
 <head>
   <meta charset="utf-8">
   <title>{% block title %}3D Print Marketplace{% endblock %}</title>
+  {% if apm_rum_endpoint and apm_rum_public_data_key %}
+  <script>
+    window.apmrum = (window.apmrum || {});
+    window.apmrum.serviceName = {{ apm_rum_service_name | tojson }};
+    window.apmrum.webApplication = {{ apm_rum_web_app_name | tojson }};
+    window.apmrum.ociDataUploadEndpoint = {{ apm_rum_endpoint | tojson }};
+    window.apmrum.OracleAPMPublicDataKey = {{ apm_rum_public_data_key | tojson }};
+    // End-to-end tracing: attach W3C traceparent headers to same-origin
+    // requests so backend spans (Flask/OTel) link into the same trace as
+    // this page's RUM session, instead of showing up as separate traces.
+    window.apmrum.traceSupportingEndpoints = [{ headers: ['W3C'], hostPattern: '.*' }];
+  </script>
+  <script async crossorigin="anonymous" src="{{ apm_rum_endpoint }}/static/jslib/apmrum.min.js"></script>
+  {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <nav class="topnav">
     <a href="{{ url_for('home') }}" class="brand">3DPrint Marketplace</a>
     {% if user %}
-      <a href="{{ url_for('list_projects') }}">Projects</a>
+      <a href="{{ url_for('list_projects') }}">Ideas</a>
       <a href="{{ url_for('list_printers') }}">Printers</a>
+      <a href="{{ url_for('list_conversations') }}">Messages
+        <span id="convo-unread-badge" style="background:#e53935; color:white; border-radius:10px;
+              padding:0 6px; font-size:0.75rem; display:none; margin-left:0.2rem;"></span>
+      </a>
       <a href="{{ url_for('list_orders') }}">Orders
         <span id="unread-badge" style="background:#e53935; color:white; border-radius:10px;
               padding:0 6px; font-size:0.75rem; display:none; margin-left:0.2rem;"></span>
@@ -47,8 +65,21 @@
       else { badge.style.display = 'none'; }
     } catch (e) { /* ignore transient errors */ }
   }
+  async function pollConversationUnread() {
+    try {
+      const res = await fetch('/api/conversations/unread_count');
+      if (!res.ok) return;
+      const { count } = await res.json();
+      const badge = document.getElementById('convo-unread-badge');
+      if (!badge) return;
+      if (count > 0) { badge.style.display = 'inline'; badge.textContent = count; }
+      else { badge.style.display = 'none'; }
+    } catch (e) { /* ignore transient errors */ }
+  }
   pollUnread();
+  pollConversationUnread();
   setInterval(pollUnread, 8000);
+  setInterval(pollConversationUnread, 8000);
   </script>
   {% endif %}
 </body>

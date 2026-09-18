@@ -1,7 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Projects</h1>
-<a class="btn" href="{{ url_for('add_project') }}">+ Post a project</a>
+<h1>Ideas</h1>
+<a class="btn" href="{{ url_for('add_project') }}">+ Post an idea</a>
+
+<form method="get" class="card" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
+  <div>
+    <label>Technology</label>
+    <select name="technology" onchange="this.form.submit()">
+      <option value="">Any</option>
+      {% for t in technologies %}
+        <option value="{{ t }}" {{ "selected" if filter_technology == t }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Material</label>
+    <select name="material" onchange="this.form.submit()">
+      <option value="">Any</option>
+      {% for m in materials %}
+        <option value="{{ m }}" {{ "selected" if filter_material == m }}>{{ m }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if filter_technology or filter_material %}
+    <a class="btn secondary" href="{{ url_for('list_projects') }}">Clear filters</a>
+  {% endif %}
+</form>
+
 {% for p in projects %}
   <div class="card">
     {% if p.image_data %}
@@ -23,12 +48,16 @@
     {% if person and p.creator_id == person.id %}
       <a class="btn secondary" href="{{ url_for('edit_project', project_id=p.id) }}">Edit</a>
       <form method="post" action="{{ url_for('delete_project', project_id=p.id) }}" style="display:inline"
-            onsubmit="return confirm('Delete this project? This also removes its orders, chats, and reviews.');">
+            onsubmit="return confirm('Delete this idea? This also removes its orders, chats, and reviews.');">
         <button type="submit" class="danger">Delete</button>
+      </form>
+    {% else %}
+      <form method="post" action="{{ url_for('contact_project_owner', project_id=p.id) }}" style="display:inline">
+        <button type="submit" class="secondary">Chat with owner</button>
       </form>
     {% endif %}
   </div>
 {% else %}
-  <p class="muted">No projects yet.</p>
+  <p class="muted">No ideas yet{{ " matching those filters" if filter_technology or filter_material }}.</p>
 {% endfor %}
 {% endblock %}

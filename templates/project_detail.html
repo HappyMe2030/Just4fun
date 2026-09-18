@@ -25,10 +25,14 @@
     {% if project.required_enclosed %}· Needs enclosed chamber{% endif %}
   </p>
   {% if is_owner %}
-    <a class="btn secondary" href="{{ url_for('edit_project', project_id=project.id) }}">Edit project</a>
+    <a class="btn secondary" href="{{ url_for('edit_project', project_id=project.id) }}">Edit idea</a>
     <form method="post" action="{{ url_for('delete_project', project_id=project.id) }}" style="display:inline"
-          onsubmit="return confirm('Delete this project? This also removes its orders, chats, and reviews.');">
+          onsubmit="return confirm('Delete this idea? This also removes its orders, chats, and reviews.');">
       <button type="submit" class="danger">Delete</button>
+    </form>
+  {% else %}
+    <form method="post" action="{{ url_for('contact_project_owner', project_id=project.id) }}" style="display:inline">
+      <button type="submit">Chat with owner</button>
     </form>
   {% endif %}
 </div>
@@ -39,12 +43,19 @@
 {% elif printers %}
   {% for pr in printers %}
     <div class="card">
-      <h3>{{ pr.name }} <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
+      <h3><a href="{{ url_for('printer_detail', printer_id=pr.id) }}">{{ pr.name }}</a>
+        <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
       <p class="muted" style="display:flex; align-items:center; gap:0.4rem;">
         <img src="{{ avatar_url(pr.owner_name, pr.owner_picture, 40) }}" alt=""
              style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
         Owner: {{ pr.owner_name }}
       </p>
+      {% if pr.review_count > 0 %}
+        <p class="muted">★ {{ pr.avg_rating }}/5 ({{ pr.review_count }} review{{ "s" if pr.review_count != 1 }}) —
+          <a href="{{ url_for('printer_detail', printer_id=pr.id) }}">see reviews</a></p>
+      {% else %}
+        <p class="muted">No reviews yet</p>
+      {% endif %}
       <span class="tag">{{ pr.technology }}</span>
       {% for m in pr.materials %}<span class="tag">{{ m }}</span>{% endfor %}
       <p class="muted">Build volume: {{ pr.build_volume_x_mm }} × {{ pr.build_volume_y_mm }} × {{ pr.build_volume_z_mm }} mm</p>

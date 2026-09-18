@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ "Edit project" if project else "Add a project" }}</h1>
+<h1>{{ "Edit idea" if project else "Add an idea" }}</h1>
 <form method="post" class="card" enctype="multipart/form-data">
   <label>Title</label>
   <input type="text" name="title" required placeholder="e.g. Articulated dragon toy" value="{{ project.title if project else '' }}">
@@ -51,6 +51,6 @@
     <label><input type="checkbox" name="required_enclosed" {{ "checked" if project and project.required_enclosed }}> Needs enclosed chamber</label>
   </div>
 
-  <button type="submit">{{ "Save changes" if project else "Post project" }}</button>
+  <button type="submit">{{ "Save changes" if project else "Post idea" }}</button>
 </form>
 {% endblock %}

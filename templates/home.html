@@ -80,6 +80,17 @@
   .panel h3 { margin: 0 0 0.4rem; }
   .panel p { color: #5b625f; font-size: 0.94rem; line-height: 1.5; margin: 0 0 1.1rem; }
 
+  .pick-idea { margin-top: 2.5rem; padding: 2rem; background: var(--ink); border-radius: 12px; }
+  .pick-idea h2 { color: var(--surface); font-size: 1.7rem; margin: 0 0 0.3rem; }
+  .pick-idea > p { color: #cfd4d1; margin: 0 0 1.4rem; }
+  .idea-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.1rem; }
+  .idea-card { background: var(--surface); border-radius: 10px; overflow: hidden; text-decoration: none;
+               color: var(--ink); display: block; }
+  .idea-card img { width: 100%; height: 130px; object-fit: cover; display: block; }
+  .idea-card .idea-card-body { padding: 0.9rem 1rem; }
+  .idea-card h3 { font-size: 1rem; margin: 0 0 0.3rem; }
+  .idea-card .stars { color: var(--accent-ink); font-weight: 600; font-size: 0.9rem; }
+
   @media (max-width: 700px) {
     .hero { flex-direction: column; }
     .hero-art { order: -1; flex: 0 0 auto; max-width: 200px; }
@@ -92,10 +103,6 @@
       <div class="hero-copy">
         <h1>Hi, {{ user.name or user.email }}</h1>
         <p>Pick up where you left off — browse what's around you or list something new.</p>
-        <div class="cta-row">
-          <a class="cta-primary" href="{{ url_for('list_projects') }}">Browse projects</a>
-          <a class="cta-secondary" href="{{ url_for('list_printers') }}">Browse printers</a>
-        </div>
       </div>
       <div class="hero-art" aria-hidden="true">
         <svg viewBox="0 0 240 210" xmlns="http://www.w3.org/2000/svg">
@@ -131,9 +138,9 @@
 
     <div class="panels">
       <div class="panel">
-        <h3>Have something to print?</h3>
+        <h3>Post your idea!</h3>
         <p>Post it with the specs it needs, and see who nearby can make it.</p>
-        <a class="cta-secondary" href="{{ url_for('add_project') }}">Post a project</a>
+        <a class="cta-secondary" href="{{ url_for('add_project') }}">Post an idea</a>
       </div>
       <div class="panel">
         <h3>Own a 3D printer?</h3>
@@ -141,11 +148,32 @@
         <a class="cta-secondary" href="{{ url_for('add_printer') }}">Add your printer</a>
       </div>
     </div>
+
+    {% if top_ideas %}
+      <div class="pick-idea">
+        <h2>Pick up an idea!</h2>
+        <p>The best-rated ideas from the community — ready for a printer near you.</p>
+        <div class="idea-grid">
+          {% for idea in top_ideas %}
+            <a class="idea-card" href="{{ url_for('project_detail', project_id=idea.id) }}">
+              {% if idea.image_data %}
+                <img src="{{ url_for('project_image', project_id=idea.id) }}" alt="">
+              {% endif %}
+              <div class="idea-card-body">
+                <h3>{{ idea.title }}</h3>
+                <span class="stars">★ {{ idea.avg_rating }}/5</span>
+                <span class="muted"> ({{ idea.review_count }} review{{ "s" if idea.review_count != 1 }})</span>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
   {% else %}
     <div class="hero">
       <div class="hero-copy">
         <h1>Something to print. Someone nearby who can print it.</h1>
-        <p>Post a project with what it needs, get matched with a 3D printer close to you, and pick it up once it's ready.</p>
+        <p>Post an idea with what it needs, get matched with a 3D printer close to you, and pick it up once it's ready.</p>
         <div class="cta-row">
           <a class="cta-primary" href="{{ url_for('login') }}">Get started</a>
           <a class="cta-secondary" href="{{ url_for('login') }}">Log in</a>
@@ -193,7 +221,7 @@
 
     <div class="stats">
       <div><strong>{{ printer_count }}</strong> printers listed</div>
-      <div><strong>{{ project_count }}</strong> projects posted</div>
+      <div><strong>{{ project_count }}</strong> ideas posted</div>
     </div>
   {% endif %}
 </div>

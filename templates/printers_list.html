@@ -7,7 +7,13 @@
 {% if my_printers %}
   {% for p in my_printers %}
     <div class="card">
-      <h3>{{ p.name }}</h3>
+      <h3><a href="{{ url_for('printer_detail', printer_id=p.id) }}">{{ p.name }}</a></h3>
+      {% if p.rating.review_count > 0 %}
+        <p class="muted">★ {{ p.rating.avg_rating }}/5 ({{ p.rating.review_count }} review{{ "s" if p.rating.review_count != 1 }}) —
+          <a href="{{ url_for('printer_detail', printer_id=p.id) }}">see reviews</a></p>
+      {% else %}
+        <p class="muted">No reviews yet</p>
+      {% endif %}
       <p class="muted">{{ p.description or "" }}</p>
       <span class="tag">{{ p.technology }}</span>
       {% for m in p.materials %}<span class="tag">{{ m }}</span>{% endfor %}
@@ -28,12 +34,36 @@
 {% endif %}
 
 <h2>Printers near you</h2>
+<form method="get" class="card" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
+  <div>
+    <label>Technology</label>
+    <select name="technology" onchange="this.form.submit()">
+      <option value="">Any</option>
+      {% for t in technologies %}
+        <option value="{{ t }}" {{ "selected" if filter_technology == t }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Material</label>
+    <select name="material" onchange="this.form.submit()">
+      <option value="">Any</option>
+      {% for m in materials %}
+        <option value="{{ m }}" {{ "selected" if filter_material == m }}>{{ m }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if filter_technology or filter_material %}
+    <a class="btn secondary" href="{{ url_for('list_printers') }}">Clear filters</a>
+  {% endif %}
+</form>
 {% if not has_location %}
   <div class="flash">Set your <a href="{{ url_for('profile') }}">location</a> to browse nearby printers.</div>
 {% elif nearby_printers %}
   {% for pr in nearby_printers %}
     <div class="card">
-      <h3>{{ pr.name }} <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
+      <h3><a href="{{ url_for('printer_detail', printer_id=pr.id) }}">{{ pr.name }}</a>
+        <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
       <p class="muted" style="display:flex; align-items:center; gap:0.4rem;">
         <img src="{{ avatar_url(pr.owner_name, pr.owner_picture, 40) }}" alt=""
              style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
@@ -44,26 +74,32 @@
       <p class="muted">Build volume: {{ pr.build_volume_x_mm }} × {{ pr.build_volume_y_mm }} × {{ pr.build_volume_z_mm }} mm</p>
 
       {% if pr.review_count > 0 %}
-        <p>★ {{ pr.avg_rating }}/5 <span class="muted">({{ pr.review_count }} review{{ "s" if pr.review_count != 1 }})</span></p>
+        <p>★ {{ pr.avg_rating }}/5 <span class="muted">({{ pr.review_count }} review{{ "s" if pr.review_count != 1 }})</span>
+          — <a href="{{ url_for('printer_detail', printer_id=pr.id) }}">see all reviews</a></p>
         {% for c in pr.recent_comments %}
           <p class="muted" style="margin:0.2rem 0;">"{{ c.comment }}" — {{ c.reviewer_name }} ({{ c.rating }}★)</p>
         {% endfor %}
       {% else %}
         <p class="muted">No reviews yet</p>
       {% endif %}
+      {% if person and pr.owner_id != person.id %}
+        <form method="post" action="{{ url_for('contact_printer_owner', printer_id=pr.id) }}" style="display:inline">
+          <button type="submit" class="secondary">Chat with owner</button>
+        </form>
+      {% endif %}
     </div>
   {% endfor %}
 
   <div style="display:flex; gap:1rem; align-items:center; margin-top:1rem;">
     {% if page > 1 %}
-      <a class="btn secondary" href="{{ url_for('list_printers', page=page-1) }}">← Previous</a>
+      <a class="btn secondary" href="{{ url_for('list_printers', page=page-1, technology=filter_technology, material=filter_material) }}">← Previous</a>
     {% endif %}
     <span class="muted">Page {{ page }} of {{ total_pages }}</span>
     {% if page < total_pages %}
-      <a class="btn secondary" href="{{ url_for('list_printers', page=page+1) }}">Next →</a>
+      <a class="btn secondary" href="{{ url_for('list_printers', page=page+1, technology=filter_technology, material=filter_material) }}">Next →</a>
     {% endif %}
   </div>
 {% else %}
-  <p class="muted">No printers listed yet.</p>
+  <p class="muted">No printers found{{ " matching those filters" if filter_technology or filter_material }}.</p>
 {% endif %}
 {% endblock %}
