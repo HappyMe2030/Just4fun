@@ -190,6 +190,42 @@ def init_db():
                 )
                 """
             )
+
+            # --- direct conversations: messaging a printer or idea owner,
+            # independent of any order (e.g. asking questions before ordering)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id SERIAL PRIMARY KEY,
+                    person_a_id INTEGER NOT NULL REFERENCES people(id),
+                    person_b_id INTEGER NOT NULL REFERENCES people(id),
+                    context_type TEXT NOT NULL CHECK (context_type IN ('printer', 'project')),
+                    context_id INTEGER NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_messages (
+                    id SERIAL PRIMARY KEY,
+                    conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+                    sender_id INTEGER NOT NULL REFERENCES people(id),
+                    body TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_reads (
+                    conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+                    person_id INTEGER NOT NULL REFERENCES people(id),
+                    last_read_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    PRIMARY KEY (conversation_id, person_id)
+                )
+                """
+            )
         conn.commit()
 
 

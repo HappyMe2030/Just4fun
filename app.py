@@ -10,6 +10,7 @@ from flask import (
     session, url_for,
 )
 import db
+import notifications
 from constants import MATERIALS, NOZZLE_DIAMETERS_MM, TECHNOLOGIES
 from images import InvalidImage, process_image
 from matching import find_nearby_printers, browse_printers, get_target_rating
@@ -55,6 +56,21 @@ def avatar_url(name, picture=None, size=64):
 app.jinja_env.globals["avatar_url"] = avatar_url
 
 
+# ---------- OCI APM: Real User Monitoring (browser) ----------
+# RUM is configured entirely via env vars so it can be turned on without code
+# changes, and skips cleanly (no snippet rendered) if unset.
+#   APM_RUM_ENDPOINT            e.g. https://aaaa....apm-agt.eu-frankfurt-1.oci.oraclecloud.com
+#                                (this is OCI's "Data Upload Endpoint" for the APM domain)
+#   APM_RUM_PUBLIC_DATA_KEY     the domain's public Data Key (RUM/browser use only —
+#                                never use the private key here, it's exposed client-side)
+#   APM_RUM_SERVICE_NAME        optional, defaults below
+#   APM_RUM_WEB_APP_NAME        optional, defaults below
+APM_RUM_ENDPOINT = os.environ.get("APM_RUM_ENDPOINT")
+APM_RUM_PUBLIC_DATA_KEY = os.environ.get("APM_RUM_PUBLIC_DATA_KEY")
+APM_RUM_SERVICE_NAME = os.environ.get("APM_RUM_SERVICE_NAME", "3D Print Marketplace")
+APM_RUM_WEB_APP_NAME = os.environ.get("APM_RUM_WEB_APP_NAME", "3d-print-marketplace")
+
+
 # ---------- auth helpers ----------
 
 def get_or_create_person(sub, name, email, picture=None):
@@ -94,7 +110,13 @@ def load_user():
 
 @app.context_processor
 def inject_user():
-    return {"user": g.get("user"), "person": g.get("person")}
+    return {
+        "user": g.get("user"), "person": g.get("person"),
+        "apm_rum_endpoint": APM_RUM_ENDPOINT,
+        "apm_rum_public_data_key": APM_RUM_PUBLIC_DATA_KEY,
+        "apm_rum_service_name": APM_RUM_SERVICE_NAME,
+        "apm_rum_web_app_name": APM_RUM_WEB_APP_NAME,
+    }
 
 
 def login_required(view):
@@ -150,9 +172,24 @@ def home():
             printer_count = cur.fetchone()["cnt"]
             cur.execute("SELECT COUNT(*) AS cnt FROM projects")
             project_count = cur.fetchone()["cnt"]
+
+            cur.execute(
+                """
+                SELECT p.*, pe.name AS creator_name, pe.picture AS creator_picture,
+                       AVG(r.rating)::numeric(3,2) AS avg_rating, COUNT(r.id) AS review_count
+                FROM projects p
+                JOIN people pe ON pe.id = p.creator_id
+                JOIN reviews r ON r.target_type = 'project' AND r.target_id = p.id
+                GROUP BY p.id, pe.name, pe.picture
+                ORDER BY avg_rating DESC, review_count DESC
+                LIMIT 6
+                """
+            )
+            top_ideas = cur.fetchall()
     return render_template(
         "home.html", has_location=has_location,
         printer_count=printer_count, project_count=project_count,
+        top_ideas=top_ideas,
     )
 
 
@@ -223,20 +260,53 @@ def list_printers():
                 (g.person["id"],),
             )
             my_printers = cur.fetchall()
+    for p in my_printers:
+        p["rating"] = get_target_rating("printer", p["id"], max_comments=0)
 
     has_location = g.person["latitude"] is not None
     per_page = 10
     page = max(1, request.args.get("page", 1, type=int))
+    filter_technology = request.args.get("technology") or None
+    filter_material = request.args.get("material") or None
     nearby_printers, total = [], 0
     if has_location:
         nearby_printers, total = browse_printers(
-            g.person["latitude"], g.person["longitude"], page=page, per_page=per_page
+            g.person["latitude"], g.person["longitude"], page=page, per_page=per_page,
+            technology=filter_technology, material=filter_material,
         )
     total_pages = max(1, (total + per_page - 1) // per_page)
 
     return render_template(
         "printers_list.html", my_printers=my_printers, has_location=has_location,
         nearby_printers=nearby_printers, page=page, total_pages=total_pages,
+        technologies=TECHNOLOGIES, materials=MATERIALS,
+        filter_technology=filter_technology, filter_material=filter_material,
+    )
+
+
+@app.route("/printers/<int:printer_id>")
+@login_required
+def printer_detail(printer_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT pr.*, pe.name AS owner_name, pe.picture AS owner_picture
+                FROM printers pr
+                JOIN people pe ON pe.id = pr.owner_id
+                WHERE pr.id = %s
+                """,
+                (printer_id,),
+            )
+            printer = cur.fetchone()
+    if not printer:
+        flash("Printer not found.")
+        return redirect(url_for("list_printers"))
+
+    is_owner = printer["owner_id"] == g.person["id"]
+    rating = get_target_rating("printer", printer_id, max_comments=50)
+    return render_template(
+        "printer_detail.html", printer=printer, is_owner=is_owner, rating=rating,
     )
 
 
@@ -372,20 +442,39 @@ def delete_printer(printer_id):
 @app.route("/projects")
 @login_required
 def list_projects():
+    filter_technology = request.args.get("technology") or None
+    filter_material = request.args.get("material") or None
+
+    where_clauses = []
+    params = {}
+    if filter_technology:
+        where_clauses.append("p.required_technology = %(technology)s")
+        params["technology"] = filter_technology
+    if filter_material:
+        where_clauses.append("%(material)s = ANY(p.required_materials)")
+        params["material"] = filter_material
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
     with db.get_conn() as conn:
         with db.dict_cursor(conn) as cur:
             cur.execute(
-                """
+                f"""
                 SELECT p.*, pe.name AS creator_name, pe.picture AS creator_picture
                 FROM projects p
                 JOIN people pe ON pe.id = p.creator_id
+                {where_sql}
                 ORDER BY p.created_at DESC
-                """
+                """,
+                params,
             )
             projects = cur.fetchall()
     for p in projects:
         p["rating"] = get_target_rating("project", p["id"], max_comments=0)
-    return render_template("projects_list.html", projects=projects)
+    return render_template(
+        "projects_list.html", projects=projects,
+        technologies=TECHNOLOGIES, materials=MATERIALS,
+        filter_technology=filter_technology, filter_material=filter_material,
+    )
 
 
 @app.route("/projects/add", methods=["GET", "POST"])
@@ -434,7 +523,7 @@ def add_project():
                     ),
                 )
             conn.commit()
-        flash("Project posted.")
+        flash("Idea posted.")
         return redirect(url_for("list_projects"))
 
     return render_template(
@@ -452,10 +541,10 @@ def edit_project(project_id):
             cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
             project = cur.fetchone()
     if not project:
-        flash("Project not found.")
+        flash("Idea not found.")
         return redirect(url_for("list_projects"))
     if project["creator_id"] != g.person["id"]:
-        flash("You can only edit your own projects.")
+        flash("You can only edit your own ideas.")
         return redirect(url_for("list_projects"))
 
     if request.method == "POST":
@@ -504,7 +593,7 @@ def edit_project(project_id):
                     ),
                 )
             conn.commit()
-        flash("Project updated.")
+        flash("Idea updated.")
         return redirect(url_for("project_detail", project_id=project_id))
 
     return render_template(
@@ -522,10 +611,10 @@ def delete_project(project_id):
             cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
             project = cur.fetchone()
     if not project:
-        flash("Project not found.")
+        flash("Idea not found.")
         return redirect(url_for("list_projects"))
     if project["creator_id"] != g.person["id"]:
-        flash("You can only delete your own projects.")
+        flash("You can only delete your own ideas.")
         return redirect(url_for("list_projects"))
 
     with db.get_conn() as conn:
@@ -545,7 +634,7 @@ def delete_project(project_id):
             cur.execute("DELETE FROM orders WHERE project_id = %s", (project_id,))
             cur.execute("DELETE FROM projects WHERE id = %s", (project_id,))
         conn.commit()
-    flash("Project deleted.")
+    flash("Idea deleted.")
     return redirect(url_for("list_projects"))
 
 
@@ -579,7 +668,7 @@ def project_detail(project_id):
             )
             project = cur.fetchone()
     if not project:
-        flash("Project not found.")
+        flash("Idea not found.")
         return redirect(url_for("list_projects"))
 
     has_location = g.person["latitude"] is not None
@@ -604,15 +693,55 @@ def create_order():
     project_id = int(request.form["project_id"])
     printer_id = int(request.form["printer_id"])
     with db.get_conn() as conn:
-        with conn.cursor() as cur:
+        with db.dict_cursor(conn) as cur:
             cur.execute(
                 """
                 INSERT INTO orders (project_id, printer_id, requester_id)
                 VALUES (%s, %s, %s)
+                RETURNING id
                 """,
                 (project_id, printer_id, g.person["id"]),
             )
+            order_id = cur.fetchone()["id"]
+
+            cur.execute(
+                """
+                SELECT pr.owner_id AS printer_owner_id, pe1.email AS printer_owner_email,
+                       pe1.name AS printer_owner_name, p.creator_id AS project_creator_id,
+                       pe2.email AS project_creator_email, pe2.name AS project_creator_name,
+                       pr.name AS printer_name, p.title AS project_title
+                FROM printers pr
+                JOIN people pe1 ON pe1.id = pr.owner_id
+                JOIN projects p ON p.id = %s
+                JOIN people pe2 ON pe2.id = p.creator_id
+                WHERE pr.id = %s
+                """,
+                (project_id, printer_id),
+            )
+            info = cur.fetchone()
         conn.commit()
+
+    requester_name = g.person["name"] or g.person["email"] or "Someone"
+    order_url = url_for("list_orders", _external=True)
+    notified_emails = set()
+    if info["printer_owner_id"] != g.person["id"] and info["printer_owner_email"]:
+        notifications.send_email(
+            app, info["printer_owner_email"], f"New print request: {info['project_title']}",
+            f"{requester_name} requested a print of \"{info['project_title']}\" on your "
+            f"printer \"{info['printer_name']}\".\n\nView it here: {order_url}",
+        )
+        notified_emails.add(info["printer_owner_email"])
+    if (
+        info["project_creator_id"] != g.person["id"]
+        and info["project_creator_email"]
+        and info["project_creator_email"] not in notified_emails
+    ):
+        notifications.send_email(
+            app, info["project_creator_email"], f"Your idea is being printed: {info['project_title']}",
+            f"{requester_name} ordered a print of your idea \"{info['project_title']}\" "
+            f"on the printer \"{info['printer_name']}\".\n\nView it here: {order_url}",
+        )
+
     flash("Request sent to the printer owner.")
     return redirect(url_for("list_orders"))
 
@@ -774,13 +903,45 @@ def send_message(order_id):
     body = body.strip()
     if not body:
         return {"error": "empty"}, 400
+
+    other_person_id = (
+        order["printer_owner_id"] if g.person["id"] == order["requester_id"]
+        else order["requester_id"]
+    )
+
     with db.get_conn() as conn:
-        with conn.cursor() as cur:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt FROM messages m
+                LEFT JOIN chat_reads cr
+                    ON cr.order_id = m.order_id AND cr.person_id = %(pid)s
+                WHERE m.order_id = %(oid)s AND m.sender_id != %(pid)s
+                  AND m.created_at > COALESCE(cr.last_read_at, '-infinity'::timestamptz)
+                """,
+                {"pid": other_person_id, "oid": order_id},
+            )
+            prior_unread = cur.fetchone()["cnt"]
+
             cur.execute(
                 "INSERT INTO messages (order_id, sender_id, body) VALUES (%s, %s, %s)",
                 (order_id, g.person["id"], body[:2000]),
             )
         conn.commit()
+
+    if other_person_id != g.person["id"] and prior_unread == 0:
+        with db.get_conn() as conn:
+            with db.dict_cursor(conn) as cur:
+                cur.execute("SELECT email FROM people WHERE id = %s", (other_person_id,))
+                recipient = cur.fetchone()
+        if recipient and recipient["email"]:
+            sender_name = g.person["name"] or g.person["email"] or "Someone"
+            chat_url = url_for("order_chat", order_id=order_id, _external=True)
+            notifications.send_email(
+                app, recipient["email"], f"New message about {order['project_title']}",
+                f"{sender_name} sent you a message:\n\n{body}\n\nReply here: {chat_url}",
+            )
+
     return {"ok": True}
 
 
@@ -870,7 +1031,7 @@ def review_order(order_id):
     targets = []
     labels = {
         "printer": f"Rate the printer ({order['printer_name']})",
-        "project": f"Rate the project ({order['project_title']})",
+        "project": f"Rate the idea ({order['project_title']})",
         "customer": "Rate the customer",
     }
     for target_type in target_types:
@@ -919,6 +1080,269 @@ def submit_review(order_id, target_type):
         conn.commit()
     flash("Thanks for the feedback!")
     return redirect(url_for("review_order", order_id=order_id))
+
+
+# ---------- direct conversations (contact a printer/idea owner) ----------
+
+def _get_or_create_conversation(context_type, context_id, other_person_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT * FROM conversations
+                WHERE context_type = %(ctype)s AND context_id = %(cid)s
+                  AND (
+                        (person_a_id = %(me)s AND person_b_id = %(other)s)
+                        OR (person_a_id = %(other)s AND person_b_id = %(me)s)
+                      )
+                """,
+                {
+                    "ctype": context_type, "cid": context_id,
+                    "me": g.person["id"], "other": other_person_id,
+                },
+            )
+            convo = cur.fetchone()
+            if convo:
+                return convo["id"]
+
+            cur.execute(
+                """
+                INSERT INTO conversations (person_a_id, person_b_id, context_type, context_id)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+                """,
+                (g.person["id"], other_person_id, context_type, context_id),
+            )
+            new_id = cur.fetchone()["id"]
+        conn.commit()
+    return new_id
+
+
+@app.route("/printers/<int:printer_id>/contact", methods=["POST"])
+@login_required
+def contact_printer_owner(printer_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM printers WHERE id = %s", (printer_id,))
+            printer = cur.fetchone()
+    if not printer:
+        flash("Printer not found.")
+        return redirect(url_for("list_printers"))
+    if printer["owner_id"] == g.person["id"]:
+        flash("That's your own printer.")
+        return redirect(url_for("printer_detail", printer_id=printer_id))
+
+    convo_id = _get_or_create_conversation("printer", printer_id, printer["owner_id"])
+    return redirect(url_for("conversation_view", conversation_id=convo_id))
+
+
+@app.route("/projects/<int:project_id>/contact", methods=["POST"])
+@login_required
+def contact_project_owner(project_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
+            project = cur.fetchone()
+    if not project:
+        flash("Idea not found.")
+        return redirect(url_for("list_projects"))
+    if project["creator_id"] == g.person["id"]:
+        flash("That's your own idea.")
+        return redirect(url_for("project_detail", project_id=project_id))
+
+    convo_id = _get_or_create_conversation("project", project_id, project["creator_id"])
+    return redirect(url_for("conversation_view", conversation_id=convo_id))
+
+
+def _get_conversation_for_participant(conversation_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM conversations WHERE id = %s", (conversation_id,))
+            convo = cur.fetchone()
+    if not convo:
+        return None, None
+    if convo["person_a_id"] == g.person["id"]:
+        return convo, convo["person_b_id"]
+    if convo["person_b_id"] == g.person["id"]:
+        return convo, convo["person_a_id"]
+    return None, None
+
+
+@app.route("/conversations")
+@login_required
+def list_conversations():
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT c.*, pe.name AS other_name, pe.picture AS other_picture,
+                       CASE WHEN c.context_type = 'printer' THEN pr.name ELSE pj.title END AS context_title,
+                       COUNT(cm.id) FILTER (
+                           WHERE cm.sender_id != %(me)s
+                             AND cm.created_at > COALESCE(cr.last_read_at, '-infinity'::timestamptz)
+                       ) AS unread_count
+                FROM conversations c
+                JOIN people pe ON pe.id = (
+                    CASE WHEN c.person_a_id = %(me)s THEN c.person_b_id ELSE c.person_a_id END
+                )
+                LEFT JOIN printers pr ON c.context_type = 'printer' AND pr.id = c.context_id
+                LEFT JOIN projects pj ON c.context_type = 'project' AND pj.id = c.context_id
+                LEFT JOIN conversation_messages cm ON cm.conversation_id = c.id
+                LEFT JOIN conversation_reads cr ON cr.conversation_id = c.id AND cr.person_id = %(me)s
+                WHERE c.person_a_id = %(me)s OR c.person_b_id = %(me)s
+                GROUP BY c.id, pe.name, pe.picture, pr.name, pj.title
+                ORDER BY c.created_at DESC
+                """,
+                {"me": g.person["id"]},
+            )
+            conversations = cur.fetchall()
+    return render_template("conversations_list.html", conversations=conversations)
+
+
+@app.route("/conversations/<int:conversation_id>")
+@login_required
+def conversation_view(conversation_id):
+    convo, other_id = _get_conversation_for_participant(conversation_id)
+    if not convo:
+        flash("You don't have access to that conversation.")
+        return redirect(url_for("list_conversations"))
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute("SELECT * FROM people WHERE id = %s", (other_id,))
+            other_person = cur.fetchone()
+            if convo["context_type"] == "printer":
+                cur.execute("SELECT name FROM printers WHERE id = %s", (convo["context_id"],))
+            else:
+                cur.execute("SELECT title AS name FROM projects WHERE id = %s", (convo["context_id"],))
+            context_row = cur.fetchone()
+    return render_template(
+        "conversation.html", conversation=convo, other_person=other_person,
+        context_name=context_row["name"] if context_row else "",
+    )
+
+
+@app.route("/conversations/<int:conversation_id>/messages.json")
+@login_required
+def conversation_messages(conversation_id):
+    convo, other_id = _get_conversation_for_participant(conversation_id)
+    if not convo:
+        abort(403)
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT cm.id, cm.body, cm.created_at, cm.sender_id, pe.name AS sender_name
+                FROM conversation_messages cm
+                JOIN people pe ON pe.id = cm.sender_id
+                WHERE cm.conversation_id = %s
+                ORDER BY cm.created_at ASC
+                """,
+                (conversation_id,),
+            )
+            rows = cur.fetchall()
+    return {
+        "messages": [
+            {
+                "id": r["id"], "body": r["body"],
+                "created_at": r["created_at"].isoformat(),
+                "is_mine": r["sender_id"] == g.person["id"],
+                "sender_name": r["sender_name"],
+            }
+            for r in rows
+        ]
+    }
+
+
+@app.route("/conversations/<int:conversation_id>/messages", methods=["POST"])
+@login_required
+def send_conversation_message(conversation_id):
+    convo, other_id = _get_conversation_for_participant(conversation_id)
+    if not convo:
+        abort(403)
+    if request.is_json:
+        body = (request.get_json(silent=True) or {}).get("body") or ""
+    else:
+        body = request.form.get("body") or ""
+    body = body.strip()
+    if not body:
+        return {"error": "empty"}, 400
+
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt FROM conversation_messages cm
+                LEFT JOIN conversation_reads cr
+                    ON cr.conversation_id = cm.conversation_id AND cr.person_id = %(pid)s
+                WHERE cm.conversation_id = %(cid)s AND cm.sender_id != %(pid)s
+                  AND cm.created_at > COALESCE(cr.last_read_at, '-infinity'::timestamptz)
+                """,
+                {"pid": other_id, "cid": conversation_id},
+            )
+            prior_unread = cur.fetchone()["cnt"]
+
+            cur.execute(
+                "INSERT INTO conversation_messages (conversation_id, sender_id, body) VALUES (%s, %s, %s)",
+                (conversation_id, g.person["id"], body[:2000]),
+            )
+        conn.commit()
+
+    if prior_unread == 0:
+        with db.get_conn() as conn:
+            with db.dict_cursor(conn) as cur:
+                cur.execute("SELECT email, name FROM people WHERE id = %s", (other_id,))
+                recipient = cur.fetchone()
+        if recipient and recipient["email"]:
+            sender_name = g.person["name"] or g.person["email"] or "Someone"
+            convo_url = url_for("conversation_view", conversation_id=conversation_id, _external=True)
+            notifications.send_email(
+                app, recipient["email"], f"New message from {sender_name}",
+                f"{sender_name} sent you a message:\n\n{body}\n\nReply here: {convo_url}",
+            )
+
+    return {"ok": True}
+
+
+@app.route("/conversations/<int:conversation_id>/mark_read", methods=["POST"])
+@login_required
+def mark_conversation_read(conversation_id):
+    convo, other_id = _get_conversation_for_participant(conversation_id)
+    if not convo:
+        abort(403)
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO conversation_reads (conversation_id, person_id, last_read_at)
+                VALUES (%s, %s, now())
+                ON CONFLICT (conversation_id, person_id) DO UPDATE SET last_read_at = now()
+                """,
+                (conversation_id, g.person["id"]),
+            )
+        conn.commit()
+    return {"ok": True}
+
+
+@app.route("/api/conversations/unread_count")
+@login_required
+def api_conversations_unread_count():
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM conversation_messages cm
+                JOIN conversations c ON c.id = cm.conversation_id
+                LEFT JOIN conversation_reads cr
+                    ON cr.conversation_id = c.id AND cr.person_id = %(pid)s
+                WHERE (c.person_a_id = %(pid)s OR c.person_b_id = %(pid)s)
+                  AND cm.sender_id != %(pid)s
+                  AND cm.created_at > COALESCE(cr.last_read_at, '-infinity'::timestamptz)
+                """,
+                {"pid": g.person["id"]},
+            )
+            count = cur.fetchone()["cnt"]
+    return {"count": count}
 
 
 @app.route("/orders")

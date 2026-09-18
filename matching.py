@@ -65,9 +65,16 @@ def find_nearby_printers(project, user_lat, user_lng, radius_km=200):
     each annotated with distance_km and mismatch_reasons (empty = full match)."""
     sql = f"""
         SELECT pr.*, {HAVERSINE_KM} AS distance_km, pe.name AS owner_name,
-               pe.picture AS owner_picture
+               pe.picture AS owner_picture,
+               COALESCE(rv.avg_rating, 0) AS avg_rating,
+               COALESCE(rv.review_count, 0) AS review_count
         FROM printers pr
         JOIN people pe ON pe.id = pr.owner_id
+        LEFT JOIN (
+            SELECT target_id, AVG(rating)::numeric(3,2) AS avg_rating,
+                   COUNT(*) AS review_count
+            FROM reviews WHERE target_type = 'printer' GROUP BY target_id
+        ) rv ON rv.target_id = pr.id
         WHERE {HAVERSINE_KM} <= %(radius)s
         ORDER BY distance_km ASC
     """
@@ -85,14 +92,28 @@ def find_nearby_printers(project, user_lat, user_lng, radius_km=200):
     return printers
 
 
-def browse_printers(user_lat, user_lng, page=1, per_page=10):
+def browse_printers(user_lat, user_lng, page=1, per_page=10, technology=None, material=None):
     """All printers, nearest first, with average rating/review count and a
-    few recent review comments each. Returns (printers, total_count)."""
+    few recent review comments each. Optionally filtered by technology
+    and/or a single required material. Returns (printers, total_count)."""
     offset = (page - 1) * per_page
+
+    where_clauses = []
+    params = {
+        "user_lat": user_lat, "user_lng": user_lng,
+        "limit": per_page, "offset": offset,
+    }
+    if technology:
+        where_clauses.append("pr.technology = %(technology)s")
+        params["technology"] = technology
+    if material:
+        where_clauses.append("%(material)s = ANY(pr.materials)")
+        params["material"] = material
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     with get_conn() as conn:
         with dict_cursor(conn) as cur:
-            cur.execute("SELECT COUNT(*) AS cnt FROM printers")
+            cur.execute(f"SELECT COUNT(*) AS cnt FROM printers pr {where_sql}", params)
             total = cur.fetchone()["cnt"]
 
             cur.execute(
@@ -108,13 +129,11 @@ def browse_printers(user_lat, user_lng, page=1, per_page=10):
                            COUNT(*) AS review_count
                     FROM reviews WHERE target_type = 'printer' GROUP BY target_id
                 ) rv ON rv.target_id = pr.id
+                {where_sql}
                 ORDER BY distance_km ASC
                 LIMIT %(limit)s OFFSET %(offset)s
                 """,
-                {
-                    "user_lat": user_lat, "user_lng": user_lng,
-                    "limit": per_page, "offset": offset,
-                },
+                params,
             )
             printers = cur.fetchall()
 
