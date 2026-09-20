@@ -1,16 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Messages</h1>
+<h1>{{ t('convo_list.title') }}</h1>
 {% for c in conversations %}
   <div class="card">
     <h3><a href="{{ url_for('conversation_view', conversation_id=c.id) }}">{{ c.other_name }}</a>
-      {% if c.unread_count > 0 %}<span class="tag" style="background:#e53935; color:white;">{{ c.unread_count }} new</span>{% endif %}
+      {% if c.unread_count > 0 %}<span class="tag" style="background:#e53935; color:white;">{{ t('orders.new_badge', count=c.unread_count) }}</span>{% endif %}
     </h3>
     <p class="muted">
-      About the {{ "printer" if c.context_type == "printer" else "idea" }}: {{ c.context_title }}
+      {% if c.context_type == "printer" %}
+        {{ t('convo_list.about_printer', name=c.context_title) }}
+      {% else %}
+        {{ t('convo_list.about_idea', name=c.context_title) }}
+      {% endif %}
     </p>
   </div>
 {% else %}
-  <p class="muted">No conversations yet — start one from a printer's or idea's page.</p>
+  <p class="muted">{{ t('convo_list.none') }}</p>
 {% endfor %}
 {% endblock %}

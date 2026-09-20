@@ -1,33 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Your profile</h1>
+<h1>{{ t('profile.title') }}</h1>
 <div class="card">
   <img src="{{ avatar_url(user.name or user.email, user.picture, 96) }}" alt=""
        style="width:72px; height:72px; border-radius:50%; object-fit:cover; float:right;">
-  <p><strong>Name:</strong> {{ user.name or "—" }}</p>
-  <p><strong>Email:</strong> {{ user.email or "—" }}</p>
-  <p><strong>Location:</strong>
+  <p><strong>{{ t('profile.name') }}</strong> {{ user.name or "—" }}</p>
+  <p><strong>{{ t('profile.email') }}</strong> {{ user.email or "—" }}</p>
+  <p><strong>{{ t('profile.location') }}</strong>
     {% if person.latitude %}
       {{ person.address or (("%.4f"|format(person.latitude)) ~ ", " ~ ("%.4f"|format(person.longitude))) }}
     {% else %}
-      <span class="muted">Not set</span>
+      <span class="muted">{{ t('profile.not_set') }}</span>
     {% endif %}
   </p>
 </div>
 
 <form id="location-form" method="post" action="{{ url_for('update_location') }}" class="card">
-  <h3>Set your location</h3>
-  <label>Address</label>
-  <input type="text" name="address" id="address-field" placeholder="e.g. 123 Main St, Springfield"
+  <h3>{{ t('profile.set_location_heading') }}</h3>
+  <label>{{ t('profile.address') }}</label>
+  <input type="text" name="address" id="address-field" placeholder="{{ t('profile.address_placeholder') }}"
          value="{{ person.address or '' }}">
-  <button type="button" id="geocode-btn" class="secondary">Find this address</button>
-  <button type="button" id="locate-btn" class="secondary">Use my current location instead</button>
+  <button type="button" id="geocode-btn" class="secondary">{{ t('profile.find_address') }}</button>
+  <button type="button" id="locate-btn" class="secondary">{{ t('profile.use_current_location') }}</button>
   <p id="geocode-status" class="muted"></p>
 
   <input type="hidden" name="latitude" id="lat-field" value="{{ person.latitude or '' }}">
   <input type="hidden" name="longitude" id="lng-field" value="{{ person.longitude or '' }}">
 
-  <button type="submit">Save location</button>
+  <button type="submit">{{ t('profile.save_location') }}</button>
 </form>
 
 <script>
@@ -35,46 +35,58 @@ const statusEl = document.getElementById('geocode-status');
 const latField = document.getElementById('lat-field');
 const lngField = document.getElementById('lng-field');
 const addressField = document.getElementById('address-field');
+const MSG = {
+  enterAddress: {{ t('profile.geocode_enter_address') | tojson }},
+  looking: {{ t('profile.geocode_looking') | tojson }},
+  foundPrefix: {{ t('profile.geocode_found', name='') | tojson }},
+  geocodeError: {{ t('profile.geocode_error') | tojson }},
+  geocodeFailed: {{ t('profile.geocode_failed') | tojson }},
+  locateUnsupported: {{ t('profile.locate_unsupported') | tojson }},
+  locating: {{ t('profile.locate_progress') | tojson }},
+  locateFoundConfirm: {{ t('profile.locate_found_confirm') | tojson }},
+  locateErrorPrefix: {{ t('profile.locate_error', err='') | tojson }},
+  submitValidation: {{ t('profile.submit_validation') | tojson }},
+};
 
 document.getElementById('geocode-btn').addEventListener('click', async function () {
   const address = addressField.value.trim();
-  if (!address) { statusEl.textContent = 'Enter an address first.'; return; }
-  statusEl.textContent = 'Looking up address…';
+  if (!address) { statusEl.textContent = MSG.enterAddress; return; }
+  statusEl.textContent = MSG.looking;
   try {
     const res = await fetch('/geocode?address=' + encodeURIComponent(address));
     const data = await res.json();
     if (!res.ok || data.error) {
-      statusEl.textContent = data.error || 'Could not find that address.';
+      statusEl.textContent = data.error || MSG.geocodeError;
       return;
     }
     latField.value = data.lat;
     lngField.value = data.lng;
-    statusEl.textContent = 'Found: ' + data.display_name;
+    statusEl.textContent = MSG.foundPrefix + data.display_name;
   } catch (e) {
-    statusEl.textContent = 'Something went wrong looking up that address.';
+    statusEl.textContent = MSG.geocodeFailed;
   }
 });
 
 document.getElementById('locate-btn').addEventListener('click', function () {
   if (!navigator.geolocation) {
-    statusEl.textContent = 'Geolocation is not supported by your browser.';
+    statusEl.textContent = MSG.locateUnsupported;
     return;
   }
-  statusEl.textContent = 'Locating…';
+  statusEl.textContent = MSG.locating;
   navigator.geolocation.getCurrentPosition(function (pos) {
     latField.value = pos.coords.latitude;
     lngField.value = pos.coords.longitude;
     addressField.value = '';
-    statusEl.textContent = 'Location found — click "Save location" to confirm.';
+    statusEl.textContent = MSG.locateFoundConfirm;
   }, function (err) {
-    statusEl.textContent = 'Could not get location: ' + err.message;
+    statusEl.textContent = MSG.locateErrorPrefix + err.message;
   });
 });
 
 document.getElementById('location-form').addEventListener('submit', function (e) {
   if (!latField.value || !lngField.value) {
     e.preventDefault();
-    statusEl.textContent = 'Find an address or use your current location first.';
+    statusEl.textContent = MSG.submitValidation;
   }
 });
 </script>

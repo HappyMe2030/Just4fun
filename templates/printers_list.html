@@ -1,90 +1,90 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Printers</h1>
-<a class="btn" href="{{ url_for('add_printer') }}">+ Add a printer</a>
+<h1>{{ t('printers.title') }}</h1>
+<a class="btn" href="{{ url_for('add_printer') }}">{{ t('printers.add_btn') }}</a>
 
-<h2>Your printers</h2>
+<h2>{{ t('printers.your_printers') }}</h2>
 {% if my_printers %}
   {% for p in my_printers %}
     <div class="card">
       <h3><a href="{{ url_for('printer_detail', printer_id=p.id) }}">{{ p.name }}</a></h3>
       {% if p.rating.review_count > 0 %}
-        <p class="muted">★ {{ p.rating.avg_rating }}/5 ({{ p.rating.review_count }} review{{ "s" if p.rating.review_count != 1 }}) —
-          <a href="{{ url_for('printer_detail', printer_id=p.id) }}">see reviews</a></p>
+        <p class="muted">{{ t('printers.reviews_summary', avg=p.rating.avg_rating, count=p.rating.review_count, reviews_word=(t('printers.review_singular') if p.rating.review_count == 1 else t('printers.review_plural'))) }} —
+          <a href="{{ url_for('printer_detail', printer_id=p.id) }}">{{ t('printers.see_reviews') }}</a></p>
       {% else %}
-        <p class="muted">No reviews yet</p>
+        <p class="muted">{{ t('printers.no_reviews') }}</p>
       {% endif %}
       <p class="muted">{{ p.description or "" }}</p>
       <span class="tag">{{ p.technology }}</span>
       {% for m in p.materials %}<span class="tag">{{ m }}</span>{% endfor %}
-      <p class="muted">Build volume: {{ p.build_volume_x_mm }} × {{ p.build_volume_y_mm }} × {{ p.build_volume_z_mm }} mm
-        {% if p.nozzle_diameter_mm %}· Nozzle {{ p.nozzle_diameter_mm }}mm{% endif %}
-        {% if p.heated_bed %}· Heated bed{% endif %}
-        {% if p.enclosed %}· Enclosed{% endif %}
+      <p class="muted">{{ t('printers.build_volume', x=p.build_volume_x_mm, y=p.build_volume_y_mm, z=p.build_volume_z_mm) }}
+        {% if p.nozzle_diameter_mm %}· {{ t('printers.nozzle', v=p.nozzle_diameter_mm) }}{% endif %}
+        {% if p.heated_bed %}· {{ t('printers.heated_bed') }}{% endif %}
+        {% if p.enclosed %}· {{ t('printers.enclosed') }}{% endif %}
       </p>
-      <a class="btn secondary" href="{{ url_for('edit_printer', printer_id=p.id) }}">Edit</a>
+      <a class="btn secondary" href="{{ url_for('edit_printer', printer_id=p.id) }}">{{ t('printers.edit') }}</a>
       <form method="post" action="{{ url_for('delete_printer', printer_id=p.id) }}" style="display:inline"
-            onsubmit="return confirm('Delete this printer? This also removes its orders, chats, and reviews.');">
-        <button type="submit" class="danger">Delete</button>
+            onsubmit="return confirm('{{ t('printers.delete_confirm') }}');">
+        <button type="submit" class="danger">{{ t('printers.delete') }}</button>
       </form>
     </div>
   {% endfor %}
 {% else %}
-  <p class="muted">You haven't listed any printers yet.</p>
+  <p class="muted">{{ t('printers.none_yet') }}</p>
 {% endif %}
 
-<h2>Printers near you</h2>
+<h2>{{ t('printers.near_you') }}</h2>
 <form method="get" class="card" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
   <div>
-    <label>Technology</label>
+    <label>{{ t('printers.filter_technology') }}</label>
     <select name="technology" onchange="this.form.submit()">
-      <option value="">Any</option>
-      {% for t in technologies %}
-        <option value="{{ t }}" {{ "selected" if filter_technology == t }}>{{ t }}</option>
+      <option value="">{{ t('printers.filter_any') }}</option>
+      {% for tech in technologies %}
+        <option value="{{ tech }}" {{ "selected" if filter_technology == tech }}>{{ tech }}</option>
       {% endfor %}
     </select>
   </div>
   <div>
-    <label>Material</label>
+    <label>{{ t('printers.filter_material') }}</label>
     <select name="material" onchange="this.form.submit()">
-      <option value="">Any</option>
+      <option value="">{{ t('printers.filter_any') }}</option>
       {% for m in materials %}
         <option value="{{ m }}" {{ "selected" if filter_material == m }}>{{ m }}</option>
       {% endfor %}
     </select>
   </div>
   {% if filter_technology or filter_material %}
-    <a class="btn secondary" href="{{ url_for('list_printers') }}">Clear filters</a>
+    <a class="btn secondary" href="{{ url_for('list_printers') }}">{{ t('printers.clear_filters') }}</a>
   {% endif %}
 </form>
 {% if not has_location %}
-  <div class="flash">Set your <a href="{{ url_for('profile') }}">location</a> to browse nearby printers.</div>
+  <div class="flash">{{ t('printers.set_location_prompt', link='<a href="' + url_for('profile') + '">' + t('printers.location_link') + '</a>') | safe }}</div>
 {% elif nearby_printers %}
   {% for pr in nearby_printers %}
     <div class="card">
       <h3><a href="{{ url_for('printer_detail', printer_id=pr.id) }}">{{ pr.name }}</a>
-        <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
+        <span class="muted">{{ t('printers.km_away', km=("%.1f"|format(pr.distance_km))) }}</span></h3>
       <p class="muted" style="display:flex; align-items:center; gap:0.4rem;">
         <img src="{{ avatar_url(pr.owner_name, pr.owner_picture, 40) }}" alt=""
              style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
-        Owner: {{ pr.owner_name }}
+        {{ t('printers.owner', name=pr.owner_name) }}
       </p>
       <span class="tag">{{ pr.technology }}</span>
       {% for m in pr.materials %}<span class="tag">{{ m }}</span>{% endfor %}
-      <p class="muted">Build volume: {{ pr.build_volume_x_mm }} × {{ pr.build_volume_y_mm }} × {{ pr.build_volume_z_mm }} mm</p>
+      <p class="muted">{{ t('printers.build_volume', x=pr.build_volume_x_mm, y=pr.build_volume_y_mm, z=pr.build_volume_z_mm) }}</p>
 
       {% if pr.review_count > 0 %}
-        <p>★ {{ pr.avg_rating }}/5 <span class="muted">({{ pr.review_count }} review{{ "s" if pr.review_count != 1 }})</span>
-          — <a href="{{ url_for('printer_detail', printer_id=pr.id) }}">see all reviews</a></p>
+        <p>{{ t('printers.reviews_summary', avg=pr.avg_rating, count=pr.review_count, reviews_word=(t('printers.review_singular') if pr.review_count == 1 else t('printers.review_plural'))) }}
+          — <a href="{{ url_for('printer_detail', printer_id=pr.id) }}">{{ t('printers.see_all_reviews') }}</a></p>
         {% for c in pr.recent_comments %}
           <p class="muted" style="margin:0.2rem 0;">"{{ c.comment }}" — {{ c.reviewer_name }} ({{ c.rating }}★)</p>
         {% endfor %}
       {% else %}
-        <p class="muted">No reviews yet</p>
+        <p class="muted">{{ t('printers.no_reviews') }}</p>
       {% endif %}
       {% if person and pr.owner_id != person.id %}
         <form method="post" action="{{ url_for('contact_printer_owner', printer_id=pr.id) }}" style="display:inline">
-          <button type="submit" class="secondary">Chat with owner</button>
+          <button type="submit" class="secondary">{{ t('printers.chat_with_owner') }}</button>
         </form>
       {% endif %}
     </div>
@@ -92,14 +92,14 @@
 
   <div style="display:flex; gap:1rem; align-items:center; margin-top:1rem;">
     {% if page > 1 %}
-      <a class="btn secondary" href="{{ url_for('list_printers', page=page-1, technology=filter_technology, material=filter_material) }}">← Previous</a>
+      <a class="btn secondary" href="{{ url_for('list_printers', page=page-1, technology=filter_technology, material=filter_material) }}">{{ t('printers.prev') }}</a>
     {% endif %}
-    <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+    <span class="muted">{{ t('printers.page_of', page=page, total=total_pages) }}</span>
     {% if page < total_pages %}
-      <a class="btn secondary" href="{{ url_for('list_printers', page=page+1, technology=filter_technology, material=filter_material) }}">Next →</a>
+      <a class="btn secondary" href="{{ url_for('list_printers', page=page+1, technology=filter_technology, material=filter_material) }}">{{ t('printers.next') }}</a>
     {% endif %}
   </div>
 {% else %}
-  <p class="muted">No printers found{{ " matching those filters" if filter_technology or filter_material }}.</p>
+  <p class="muted">{{ t('printers.none_found', suffix=(t('printers.matching_filters') if filter_technology or filter_material else '')) }}</p>
 {% endif %}
 {% endblock %}

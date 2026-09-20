@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ "Edit printer" if printer else "Add a printer" }}</h1>
+<h1>{{ t('printer_form.edit_title') if printer else t('printer_form.add_title') }}</h1>
 {% if not printer and not person.latitude %}
-  <div class="flash">Set your <a href="{{ url_for('profile') }}">location</a> first — new printers default to it, and you can adjust below.</div>
+  <div class="flash">{{ t('printer_form.set_location_first', link='<a href="' + url_for('profile') + '">' + t('printers.location_link') + '</a>') | safe }}</div>
 {% endif %}
 <form method="post" class="card">
-  <label>Name</label>
+  <label>{{ t('printer_form.name') }}</label>
   <input type="text" name="name" required placeholder="e.g. Garage Bambu A1" value="{{ printer.name if printer else '' }}">
 
-  <label>Description</label>
+  <label>{{ t('printer_form.description') }}</label>
   <textarea name="description" rows="2">{{ printer.description if printer else '' }}</textarea>
 
-  <label>Technology</label>
+  <label>{{ t('printer_form.technology') }}</label>
   <select name="technology" required>
-    {% for t in technologies %}
-      <option value="{{ t }}" {{ "selected" if printer and printer.technology == t }}>{{ t }}</option>
+    {% for tech in technologies %}
+      <option value="{{ tech }}" {{ "selected" if printer and printer.technology == tech }}>{{ tech }}</option>
     {% endfor %}
   </select>
 
-  <label>Materials supported</label>
+  <label>{{ t('printer_form.materials') }}</label>
   <div class="checkboxes">
     {% for m in materials %}
       <label><input type="checkbox" name="materials" value="{{ m }}"
@@ -26,40 +26,40 @@
     {% endfor %}
   </div>
 
-  <label>Nozzle diameter (mm, if FDM)</label>
+  <label>{{ t('printer_form.nozzle_diameter') }}</label>
   <select name="nozzle_diameter_mm">
-    <option value="">N/A</option>
+    <option value="">{{ t('printer_form.na') }}</option>
     {% for n in nozzle_diameters %}
       <option value="{{ n }}" {{ "selected" if printer and printer.nozzle_diameter_mm and printer.nozzle_diameter_mm|float == n }}>{{ n }}</option>
     {% endfor %}
   </select>
 
-  <label>Build volume (mm)</label>
+  <label>{{ t('printer_form.build_volume') }}</label>
   <div style="display:flex; gap:0.5rem;">
     <input type="number" name="build_volume_x_mm" placeholder="X" required min="1" value="{{ printer.build_volume_x_mm if printer else '' }}">
     <input type="number" name="build_volume_y_mm" placeholder="Y" required min="1" value="{{ printer.build_volume_y_mm if printer else '' }}">
     <input type="number" name="build_volume_z_mm" placeholder="Z" required min="1" value="{{ printer.build_volume_z_mm if printer else '' }}">
   </div>
 
-  <label>Max nozzle temp (°C, optional)</label>
+  <label>{{ t('printer_form.max_temp') }}</label>
   <input type="number" name="max_nozzle_temp_c" value="{{ printer.max_nozzle_temp_c if printer and printer.max_nozzle_temp_c else '' }}">
 
   <div class="checkboxes" style="margin-top:0.8rem;">
-    <label><input type="checkbox" name="heated_bed" {{ "checked" if printer and printer.heated_bed }}> Heated bed</label>
-    <label><input type="checkbox" name="enclosed" {{ "checked" if printer and printer.enclosed }}> Enclosed chamber</label>
+    <label><input type="checkbox" name="heated_bed" {{ "checked" if printer and printer.heated_bed }}> {{ t('printers.heated_bed') }}</label>
+    <label><input type="checkbox" name="enclosed" {{ "checked" if printer and printer.enclosed }}> {{ t('printers.enclosed') }}</label>
   </div>
 
-  <label>Address</label>
-  <input type="text" name="address" id="address-field" placeholder="e.g. 123 Main St, Springfield"
+  <label>{{ t('printer_form.address') }}</label>
+  <input type="text" name="address" id="address-field" placeholder="{{ t('printer_form.address_placeholder') }}"
          value="{{ printer.address if printer else (person.address or '') }}">
-  <button type="button" id="geocode-btn" class="secondary">Find this address</button>
-  <button type="button" id="locate-btn" class="secondary">Use my current location instead</button>
+  <button type="button" id="geocode-btn" class="secondary">{{ t('printer_form.find_address') }}</button>
+  <button type="button" id="locate-btn" class="secondary">{{ t('printer_form.use_current_location') }}</button>
   <p id="geocode-status" class="muted"></p>
 
   <input type="hidden" name="latitude" id="lat-field" value="{{ printer.latitude if printer else (person.latitude or '') }}">
   <input type="hidden" name="longitude" id="lng-field" value="{{ printer.longitude if printer else (person.longitude or '') }}">
 
-  <button type="submit">{{ "Save changes" if printer else "Add printer" }}</button>
+  <button type="submit">{{ t('printer_form.save') if printer else t('printer_form.add') }}</button>
 </form>
 
 <script>
@@ -67,46 +67,58 @@ const statusEl = document.getElementById('geocode-status');
 const latField = document.getElementById('lat-field');
 const lngField = document.getElementById('lng-field');
 const addressField = document.getElementById('address-field');
+const MSG = {
+  enterAddress: {{ t('printer_form.geocode_enter_address') | tojson }},
+  looking: {{ t('printer_form.geocode_looking') | tojson }},
+  foundPrefix: {{ t('printer_form.geocode_found', name='') | tojson }},
+  geocodeError: {{ t('printer_form.geocode_error') | tojson }},
+  geocodeFailed: {{ t('printer_form.geocode_failed') | tojson }},
+  locateUnsupported: {{ t('printer_form.locate_unsupported') | tojson }},
+  locating: {{ t('printer_form.locate_progress') | tojson }},
+  locateFound: {{ t('printer_form.locate_found') | tojson }},
+  locateErrorPrefix: {{ t('printer_form.locate_error', err='') | tojson }},
+  submitValidation: {{ t('printer_form.submit_validation') | tojson }},
+};
 
 document.getElementById('geocode-btn').addEventListener('click', async function () {
   const address = addressField.value.trim();
-  if (!address) { statusEl.textContent = 'Enter an address first.'; return; }
-  statusEl.textContent = 'Looking up address…';
+  if (!address) { statusEl.textContent = MSG.enterAddress; return; }
+  statusEl.textContent = MSG.looking;
   try {
     const res = await fetch('/geocode?address=' + encodeURIComponent(address));
     const data = await res.json();
     if (!res.ok || data.error) {
-      statusEl.textContent = data.error || 'Could not find that address.';
+      statusEl.textContent = data.error || MSG.geocodeError;
       return;
     }
     latField.value = data.lat;
     lngField.value = data.lng;
-    statusEl.textContent = 'Found: ' + data.display_name;
+    statusEl.textContent = MSG.foundPrefix + data.display_name;
   } catch (e) {
-    statusEl.textContent = 'Something went wrong looking up that address.';
+    statusEl.textContent = MSG.geocodeFailed;
   }
 });
 
 document.getElementById('locate-btn').addEventListener('click', function () {
   if (!navigator.geolocation) {
-    statusEl.textContent = 'Geolocation is not supported by your browser.';
+    statusEl.textContent = MSG.locateUnsupported;
     return;
   }
-  statusEl.textContent = 'Locating…';
+  statusEl.textContent = MSG.locating;
   navigator.geolocation.getCurrentPosition(function (pos) {
     latField.value = pos.coords.latitude;
     lngField.value = pos.coords.longitude;
     addressField.value = '';
-    statusEl.textContent = 'Location found.';
+    statusEl.textContent = MSG.locateFound;
   }, function (err) {
-    statusEl.textContent = 'Could not get location: ' + err.message;
+    statusEl.textContent = MSG.locateErrorPrefix + err.message;
   });
 });
 
 document.querySelector('form').addEventListener('submit', function (e) {
   if (!latField.value || !lngField.value) {
     e.preventDefault();
-    statusEl.textContent = 'Find an address or use your current location first.';
+    statusEl.textContent = MSG.submitValidation;
   }
 });
 </script>

@@ -4,41 +4,41 @@
 <p class="muted" style="display:flex; align-items:center; gap:0.4rem; margin-top:-0.5rem;">
   <img src="{{ avatar_url(printer.owner_name, printer.owner_picture, 40) }}" alt=""
        style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
-  Owned by {{ printer.owner_name }}
+  {{ t('printer_detail.owned_by', name=printer.owner_name) }}
 </p>
 
 <div class="card">
   {% if rating.review_count > 0 %}
-    <p>★ {{ rating.avg_rating }}/5 <span class="muted">({{ rating.review_count }} review{{ "s" if rating.review_count != 1 }})</span></p>
+    <p>{{ t('printers.reviews_summary', avg=rating.avg_rating, count=rating.review_count, reviews_word=(t('printers.review_singular') if rating.review_count == 1 else t('printers.review_plural'))) }}</p>
   {% else %}
-    <p class="muted">No reviews yet</p>
+    <p class="muted">{{ t('printers.no_reviews') }}</p>
   {% endif %}
 
   <p class="muted">{{ printer.description or "" }}</p>
   <span class="tag">{{ printer.technology }}</span>
   {% for m in printer.materials %}<span class="tag">{{ m }}</span>{% endfor %}
-  <p class="muted">Build volume: {{ printer.build_volume_x_mm }} × {{ printer.build_volume_y_mm }} × {{ printer.build_volume_z_mm }} mm
-    {% if printer.nozzle_diameter_mm %}· Nozzle {{ printer.nozzle_diameter_mm }}mm{% endif %}
-    {% if printer.max_nozzle_temp_c %}· Max nozzle temp {{ printer.max_nozzle_temp_c }}°C{% endif %}
-    {% if printer.heated_bed %}· Heated bed{% endif %}
-    {% if printer.enclosed %}· Enclosed{% endif %}
+  <p class="muted">{{ t('printers.build_volume', x=printer.build_volume_x_mm, y=printer.build_volume_y_mm, z=printer.build_volume_z_mm) }}
+    {% if printer.nozzle_diameter_mm %}· {{ t('printers.nozzle', v=printer.nozzle_diameter_mm) }}{% endif %}
+    {% if printer.max_nozzle_temp_c %}· {{ t('printer_detail.max_temp', v=printer.max_nozzle_temp_c) }}{% endif %}
+    {% if printer.heated_bed %}· {{ t('printers.heated_bed') }}{% endif %}
+    {% if printer.enclosed %}· {{ t('printers.enclosed') }}{% endif %}
   </p>
-  {% if printer.address %}<p class="muted">Located near: {{ printer.address }}</p>{% endif %}
+  {% if printer.address %}<p class="muted">{{ t('printer_detail.located_near', address=printer.address) }}</p>{% endif %}
 
   {% if is_owner %}
-    <a class="btn secondary" href="{{ url_for('edit_printer', printer_id=printer.id) }}">Edit</a>
+    <a class="btn secondary" href="{{ url_for('edit_printer', printer_id=printer.id) }}">{{ t('printers.edit') }}</a>
     <form method="post" action="{{ url_for('delete_printer', printer_id=printer.id) }}" style="display:inline"
-          onsubmit="return confirm('Delete this printer? This also removes its orders, chats, and reviews.');">
-      <button type="submit" class="danger">Delete</button>
+          onsubmit="return confirm('{{ t('printers.delete_confirm') }}');">
+      <button type="submit" class="danger">{{ t('printers.delete') }}</button>
     </form>
   {% else %}
     <form method="post" action="{{ url_for('contact_printer_owner', printer_id=printer.id) }}" style="display:inline">
-      <button type="submit">Chat with owner</button>
+      <button type="submit">{{ t('printers.chat_with_owner') }}</button>
     </form>
   {% endif %}
 </div>
 
-<h2>Reviews</h2>
+<h2>{{ t('printer_detail.reviews_heading') }}</h2>
 {% if rating.comments %}
   {% for c in rating.comments %}
     <div class="card">
@@ -47,6 +47,6 @@
     </div>
   {% endfor %}
 {% else %}
-  <p class="muted">No written reviews yet.</p>
+  <p class="muted">{{ t('printer_detail.no_written_reviews') }}</p>
 {% endif %}
 {% endblock %}

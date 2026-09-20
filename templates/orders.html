@@ -1,30 +1,30 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Orders</h1>
+<h1>{{ t('orders.title') }}</h1>
 
 {% macro placed_card(o) %}
   <div class="card">
     <h3><a href="{{ url_for('project_detail', project_id=o.project_id) }}">{{ o.project_title }}</a>
       <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
-    <p class="muted">Printer: {{ o.printer_name }} (owner: {{ o.owner_name }})</p>
-    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat
-      {% if o.unread_count > 0 %}<span class="tag" style="background:#e53935; color:white;">{{ o.unread_count }} new</span>{% endif %}
+    <p class="muted">{{ t('orders.printer_owner', printer=o.printer_name, owner=o.owner_name) }}</p>
+    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">{{ t('orders.chat') }}
+      {% if o.unread_count > 0 %}<span class="tag" style="background:#e53935; color:white;">{{ t('orders.new_badge', count=o.unread_count) }}</span>{% endif %}
     </a>
     {% if o.status == 'ready_for_pickup' %}
-      <p><strong>Ready for pickup</strong> at the printer's location.</p>
+      <p><strong>{{ t('orders.ready_pickup') }}</strong></p>
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='completed') }}" style="display:inline">
-        <button type="submit">Mark picked up</button>
+        <button type="submit">{{ t('orders.mark_picked_up') }}</button>
       </form>
     {% elif o.status == 'pending' %}
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='cancelled') }}" style="display:inline">
-        <button type="submit" class="secondary">Cancel request</button>
+        <button type="submit" class="secondary">{{ t('orders.cancel') }}</button>
       </form>
     {% elif o.status == 'completed' %}
-      <a class="btn" href="{{ url_for('review_order', order_id=o.id) }}">Rate & review</a>
+      <a class="btn" href="{{ url_for('review_order', order_id=o.id) }}">{{ t('orders.rate_review') }}</a>
     {% endif %}
     <form method="post" action="{{ url_for('delete_order', order_id=o.id) }}" style="display:inline"
-          onsubmit="return confirm('Delete this order? This also removes its chat and reviews.');">
-      <button type="submit" class="danger">Delete</button>
+          onsubmit="return confirm('{{ t('orders.delete_confirm') }}');">
+      <button type="submit" class="danger">{{ t('orders.delete') }}</button>
     </form>
   </div>
 {% endmacro %}
@@ -33,34 +33,34 @@
   <div class="card">
     <h3><a href="{{ url_for('project_detail', project_id=o.project_id) }}">{{ o.project_title }}</a>
       <span class="status status-{{ o.status }}">{{ o.status }}</span></h3>
-    <p class="muted">Printer: {{ o.printer_name }} · Requested by: {{ o.requester_name }}</p>
+    <p class="muted">{{ t('orders.printer_requester', printer=o.printer_name, requester=o.requester_name) }}</p>
     {% if o.status == 'pending' and o.requester_rating %}
       {% if o.requester_rating.review_count > 0 %}
-        <p class="muted">Customer rating: ★ {{ o.requester_rating.avg_rating }}/5 ({{ o.requester_rating.review_count }} review{{ "s" if o.requester_rating.review_count != 1 }})</p>
+        <p class="muted">{{ t('orders.customer_rating', avg=o.requester_rating.avg_rating, count=o.requester_rating.review_count, reviews_word=(t('printers.review_singular') if o.requester_rating.review_count == 1 else t('printers.review_plural'))) }}</p>
       {% else %}
-        <p class="muted">Customer has no prior reviews yet.</p>
+        <p class="muted">{{ t('orders.customer_no_reviews') }}</p>
       {% endif %}
     {% endif %}
-    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">Chat with requester
-      {% if o.unread_count > 0 %}<span class="tag" style="background:#e53935; color:white;">{{ o.unread_count }} new</span>{% endif %}
+    <a class="btn secondary" href="{{ url_for('order_chat', order_id=o.id) }}">{{ t('orders.chat_with_requester') }}
+      {% if o.unread_count > 0 %}<span class="tag" style="background:#e53935; color:white;">{{ t('orders.new_badge', count=o.unread_count) }}</span>{% endif %}
     </a>
     {% if o.status == 'pending' %}
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='accepted') }}" style="display:inline">
-        <button type="submit">Accept</button>
+        <button type="submit">{{ t('orders.accept') }}</button>
       </form>
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='rejected') }}" style="display:inline">
-        <button type="submit" class="danger">Reject</button>
+        <button type="submit" class="danger">{{ t('orders.reject') }}</button>
       </form>
     {% elif o.status == 'accepted' %}
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='printing') }}" style="display:inline">
-        <button type="submit">Start printing</button>
+        <button type="submit">{{ t('orders.start_printing') }}</button>
       </form>
     {% elif o.status == 'printing' %}
       <form method="post" action="{{ url_for('order_transition', order_id=o.id, new_status='ready_for_pickup') }}" style="display:inline">
-        <button type="submit">Mark ready for pickup</button>
+        <button type="submit">{{ t('orders.mark_ready') }}</button>
       </form>
     {% elif o.status == 'completed' %}
-      <a class="btn" href="{{ url_for('review_order', order_id=o.id) }}">Rate & review</a>
+      <a class="btn" href="{{ url_for('review_order', order_id=o.id) }}">{{ t('orders.rate_review') }}</a>
     {% endif %}
   </div>
 {% endmacro %}
@@ -75,16 +75,16 @@
   </style>
   <div class="orders-columns">
     <div class="orders-col">
-      <h2>Orders you received</h2>
-      {% for o in incoming %}{{ received_card(o) }}{% else %}<p class="muted">No requests for your printers yet.</p>{% endfor %}
+      <h2>{{ t('orders.received') }}</h2>
+      {% for o in incoming %}{{ received_card(o) }}{% else %}<p class="muted">{{ t('orders.none_received') }}</p>{% endfor %}
     </div>
     <div class="orders-col">
-      <h2>Orders you placed</h2>
-      {% for o in my_requests %}{{ placed_card(o) }}{% else %}<p class="muted">You haven't requested any prints yet.</p>{% endfor %}
+      <h2>{{ t('orders.placed') }}</h2>
+      {% for o in my_requests %}{{ placed_card(o) }}{% else %}<p class="muted">{{ t('orders.none_placed') }}</p>{% endfor %}
     </div>
   </div>
 {% else %}
-  <h2>Orders you placed</h2>
-  {% for o in my_requests %}{{ placed_card(o) }}{% else %}<p class="muted">You haven't requested any prints yet.</p>{% endfor %}
+  <h2>{{ t('orders.placed') }}</h2>
+  {% for o in my_requests %}{{ placed_card(o) }}{% else %}<p class="muted">{{ t('orders.none_placed') }}</p>{% endfor %}
 {% endif %}
 {% endblock %}

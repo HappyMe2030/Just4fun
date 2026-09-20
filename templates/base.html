@@ -21,26 +21,36 @@
 </head>
 <body>
   <nav class="topnav">
-    <a href="{{ url_for('home') }}" class="brand">3DPrint Marketplace</a>
+    <a href="{{ url_for('home') }}" class="brand">{{ t('nav.brand') }}</a>
     {% if user %}
-      <a href="{{ url_for('list_projects') }}">Ideas</a>
-      <a href="{{ url_for('list_printers') }}">Printers</a>
-      <a href="{{ url_for('list_conversations') }}">Messages
+      <a href="{{ url_for('list_projects') }}">{{ t('nav.ideas') }}</a>
+      <a href="{{ url_for('list_printers') }}">{{ t('nav.printers') }}</a>
+      <a href="{{ url_for('list_conversations') }}">{{ t('nav.messages') }}
         <span id="convo-unread-badge" style="background:#e53935; color:white; border-radius:10px;
               padding:0 6px; font-size:0.75rem; display:none; margin-left:0.2rem;"></span>
       </a>
-      <a href="{{ url_for('list_orders') }}">Orders
+      <a href="{{ url_for('list_orders') }}">{{ t('nav.orders') }}
         <span id="unread-badge" style="background:#e53935; color:white; border-radius:10px;
               padding:0 6px; font-size:0.75rem; display:none; margin-left:0.2rem;"></span>
       </a>
-      <a href="{{ url_for('profile') }}">Profile</a>
+      <a href="{{ url_for('profile') }}">{{ t('nav.profile') }}</a>
+      <select onchange="if(this.value) window.location.href=this.value" style="margin:0; padding:0.2rem;">
+        {% for code in supported_languages %}
+          <option value="{{ request.path }}?lang={{ code }}" {{ "selected" if locale == code }}>{{ language_names[code] }}</option>
+        {% endfor %}
+      </select>
       <a href="{{ url_for('logout') }}" class="right" style="display:flex; align-items:center; gap:0.5rem;">
         <img src="{{ avatar_url(user.name or user.email, user.picture, 32) }}" alt=""
              style="width:24px; height:24px; border-radius:50%; object-fit:cover;">
-        Log out ({{ user.name or user.email }})
+        {{ t('nav.logout', name=(user.name or user.email)) }}
       </a>
     {% else %}
-      <a href="{{ url_for('login') }}" class="right">Log in / Sign up</a>
+      <select onchange="if(this.value) window.location.href=this.value" style="margin:0; padding:0.2rem;">
+        {% for code in supported_languages %}
+          <option value="{{ request.path }}?lang={{ code }}" {{ "selected" if locale == code }}>{{ language_names[code] }}</option>
+        {% endfor %}
+      </select>
+      <a href="{{ url_for('login') }}" class="right">{{ t('nav.login') }}</a>
     {% endif %}
   </nav>
   <main>

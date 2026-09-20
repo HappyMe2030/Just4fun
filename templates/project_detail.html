@@ -4,14 +4,14 @@
 <p class="muted" style="display:flex; align-items:center; gap:0.4rem; margin-top:-0.5rem;">
   <img src="{{ avatar_url(project.creator_name, project.creator_picture, 40) }}" alt=""
        style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
-  Posted by {{ project.creator_name }}
+  {{ t('idea_detail.posted_by', name=project.creator_name) }}
 </p>
 <div class="card">
-  {% if project.image_data %}
+  {% if project.has_image %}
     <img src="{{ url_for('project_image', project_id=project.id) }}" alt="" style="max-width:100%; border-radius:6px; margin-bottom:0.8rem;">
   {% endif %}
   {% if rating.review_count > 0 %}
-    <p>★ {{ rating.avg_rating }}/5 <span class="muted">({{ rating.review_count }} review{{ "s" if rating.review_count != 1 }})</span></p>
+    <p>{{ t('idea_detail.reviews_summary', avg=rating.avg_rating, count=rating.review_count, reviews_word=(t('idea_detail.review_singular') if rating.review_count == 1 else t('idea_detail.review_plural'))) }}</p>
     {% for c in rating.comments %}
       <p class="muted" style="margin:0.2rem 0;">"{{ c.comment }}" — {{ c.reviewer_name }} ({{ c.rating }}★)</p>
     {% endfor %}
@@ -19,66 +19,71 @@
   <p>{{ project.description or "" }}</p>
   <span class="tag">{{ project.required_technology }}</span>
   {% for m in project.required_materials %}<span class="tag">{{ m }}</span>{% endfor %}
-  <p class="muted">Needs build volume ≥ {{ project.required_build_volume_x_mm }} × {{ project.required_build_volume_y_mm }} × {{ project.required_build_volume_z_mm }} mm
-    {% if project.required_nozzle_diameter_max_mm %}· Nozzle ≤ {{ project.required_nozzle_diameter_max_mm }}mm{% endif %}
-    {% if project.required_heated_bed %}· Needs heated bed{% endif %}
-    {% if project.required_enclosed %}· Needs enclosed chamber{% endif %}
+  <p class="muted">{{ t('ideas.needs_volume', x=project.required_build_volume_x_mm, y=project.required_build_volume_y_mm, z=project.required_build_volume_z_mm) }}
+    {% if project.required_nozzle_diameter_max_mm %}· {{ t('idea_detail.nozzle_max', v=project.required_nozzle_diameter_max_mm) }}{% endif %}
+    {% if project.required_heated_bed %}· {{ t('idea_form.needs_heated_bed') }}{% endif %}
+    {% if project.required_enclosed %}· {{ t('idea_form.needs_enclosed') }}{% endif %}
   </p>
+
+  {% if project.has_file %}
+    <a class="btn" href="{{ url_for('project_download', project_id=project.id) }}">{{ t('idea_detail.download_file', name=project.file_name) }}</a>
+  {% endif %}
+
   {% if is_owner %}
-    <a class="btn secondary" href="{{ url_for('edit_project', project_id=project.id) }}">Edit idea</a>
+    <a class="btn secondary" href="{{ url_for('edit_project', project_id=project.id) }}">{{ t('idea_detail.edit_idea') }}</a>
     <form method="post" action="{{ url_for('delete_project', project_id=project.id) }}" style="display:inline"
-          onsubmit="return confirm('Delete this idea? This also removes its orders, chats, and reviews.');">
-      <button type="submit" class="danger">Delete</button>
+          onsubmit="return confirm('{{ t('ideas.delete_confirm') }}');">
+      <button type="submit" class="danger">{{ t('ideas.delete') }}</button>
     </form>
   {% else %}
     <form method="post" action="{{ url_for('contact_project_owner', project_id=project.id) }}" style="display:inline">
-      <button type="submit">Chat with owner</button>
+      <button type="submit">{{ t('ideas.chat_with_owner') }}</button>
     </form>
   {% endif %}
 </div>
 
-<h2>Printers near you</h2>
+<h2>{{ t('idea_detail.printers_near_you') }}</h2>
 {% if not has_location %}
-  <div class="flash">Set your <a href="{{ url_for('profile') }}">location</a> to see nearby printers.</div>
+  <div class="flash">{{ t('idea_detail.set_location_prompt', link='<a href="' + url_for('profile') + '">' + t('printers.location_link') + '</a>') | safe }}</div>
 {% elif printers %}
   {% for pr in printers %}
     <div class="card">
       <h3><a href="{{ url_for('printer_detail', printer_id=pr.id) }}">{{ pr.name }}</a>
-        <span class="muted">— {{ "%.1f"|format(pr.distance_km) }} km away</span></h3>
+        <span class="muted">{{ t('printers.km_away', km=("%.1f"|format(pr.distance_km))) }}</span></h3>
       <p class="muted" style="display:flex; align-items:center; gap:0.4rem;">
         <img src="{{ avatar_url(pr.owner_name, pr.owner_picture, 40) }}" alt=""
              style="width:22px; height:22px; border-radius:50%; object-fit:cover;">
-        Owner: {{ pr.owner_name }}
+        {{ t('printers.owner', name=pr.owner_name) }}
       </p>
       {% if pr.review_count > 0 %}
-        <p class="muted">★ {{ pr.avg_rating }}/5 ({{ pr.review_count }} review{{ "s" if pr.review_count != 1 }}) —
-          <a href="{{ url_for('printer_detail', printer_id=pr.id) }}">see reviews</a></p>
+        <p class="muted">{{ t('printers.reviews_summary', avg=pr.avg_rating, count=pr.review_count, reviews_word=(t('printers.review_singular') if pr.review_count == 1 else t('printers.review_plural'))) }} —
+          <a href="{{ url_for('printer_detail', printer_id=pr.id) }}">{{ t('printers.see_reviews') }}</a></p>
       {% else %}
-        <p class="muted">No reviews yet</p>
+        <p class="muted">{{ t('printers.no_reviews') }}</p>
       {% endif %}
       <span class="tag">{{ pr.technology }}</span>
       {% for m in pr.materials %}<span class="tag">{{ m }}</span>{% endfor %}
-      <p class="muted">Build volume: {{ pr.build_volume_x_mm }} × {{ pr.build_volume_y_mm }} × {{ pr.build_volume_z_mm }} mm</p>
+      <p class="muted">{{ t('printers.build_volume', x=pr.build_volume_x_mm, y=pr.build_volume_y_mm, z=pr.build_volume_z_mm) }}</p>
       {% if pr.mismatch_reasons %}
         <div class="flash" style="background:#fde2e1; border-color:#e5a3a0;">
-          <strong>⚠ Doesn't fully match this project:</strong>
+          <strong>{{ t('idea_detail.mismatch_heading') }}</strong>
           <ul style="margin:0.3rem 0 0 1.1rem; padding:0;">
             {% for reason in pr.mismatch_reasons %}<li>{{ reason }}</li>{% endfor %}
           </ul>
         </div>
       {% else %}
-        <p class="muted">✓ Meets all requirements</p>
+        <p class="muted">{{ t('idea_detail.meets_requirements') }}</p>
       {% endif %}
       <form method="post" action="{{ url_for('create_order') }}">
         <input type="hidden" name="project_id" value="{{ project.id }}">
         <input type="hidden" name="printer_id" value="{{ pr.id }}">
         <button type="submit" {{ "class=secondary" if pr.mismatch_reasons }}>
-          {{ "Request anyway" if pr.mismatch_reasons else "Request this printer" }}
+          {{ t('idea_detail.request_anyway') if pr.mismatch_reasons else t('idea_detail.request_printer') }}
         </button>
       </form>
     </div>
   {% endfor %}
 {% else %}
-  <p class="muted">No printers found within range yet.</p>
+  <p class="muted">{{ t('idea_detail.none_found') }}</p>
 {% endif %}
 {% endblock %}

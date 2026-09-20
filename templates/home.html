@@ -101,8 +101,8 @@
   {% if user %}
     <div class="hero">
       <div class="hero-copy">
-        <h1>Hi, {{ user.name or user.email }}</h1>
-        <p>Pick up where you left off — browse what's around you or list something new.</p>
+        <h1>{{ t('home.hi', name=(user.name or user.email)) }}</h1>
+        <p>{{ t('home.hi_sub') }}</p>
       </div>
       <div class="hero-art" aria-hidden="true">
         <svg viewBox="0 0 240 210" xmlns="http://www.w3.org/2000/svg">
@@ -129,40 +129,40 @@
     {% if not has_location %}
       <div class="panels" style="margin-bottom:1.5rem;">
         <div class="panel">
-          <h3>Set your location</h3>
-          <p>We use it to show you printers and requests nearby.</p>
-          <a class="cta-primary" href="{{ url_for('profile') }}">Set my location</a>
+          <h3>{{ t('home.set_location') }}</h3>
+          <p>{{ t('home.set_location_sub') }}</p>
+          <a class="cta-primary" href="{{ url_for('profile') }}">{{ t('home.set_location_btn') }}</a>
         </div>
       </div>
     {% endif %}
 
     <div class="panels">
       <div class="panel">
-        <h3>Post your idea!</h3>
-        <p>Post it with the specs it needs, and see who nearby can make it.</p>
-        <a class="cta-secondary" href="{{ url_for('add_project') }}">Post an idea</a>
+        <h3>{{ t('home.post_idea_title') }}</h3>
+        <p>{{ t('home.post_idea_sub') }}</p>
+        <a class="cta-secondary" href="{{ url_for('add_project') }}">{{ t('home.post_idea_btn') }}</a>
       </div>
       <div class="panel">
-        <h3>Own a 3D printer?</h3>
-        <p>List its capabilities so people nearby can order prints from it.</p>
-        <a class="cta-secondary" href="{{ url_for('add_printer') }}">Add your printer</a>
+        <h3>{{ t('home.own_printer_title') }}</h3>
+        <p>{{ t('home.own_printer_sub') }}</p>
+        <a class="cta-secondary" href="{{ url_for('add_printer') }}">{{ t('home.add_printer_btn') }}</a>
       </div>
     </div>
 
     {% if top_ideas %}
       <div class="pick-idea">
-        <h2>Pick up an idea!</h2>
-        <p>The best-rated ideas from the community — ready for a printer near you.</p>
+        <h2>{{ t('home.pick_idea_title') }}</h2>
+        <p>{{ t('home.pick_idea_sub') }}</p>
         <div class="idea-grid">
           {% for idea in top_ideas %}
             <a class="idea-card" href="{{ url_for('project_detail', project_id=idea.id) }}">
-              {% if idea.image_data %}
+              {% if idea.has_image %}
                 <img src="{{ url_for('project_image', project_id=idea.id) }}" alt="">
               {% endif %}
               <div class="idea-card-body">
                 <h3>{{ idea.title }}</h3>
                 <span class="stars">★ {{ idea.avg_rating }}/5</span>
-                <span class="muted"> ({{ idea.review_count }} review{{ "s" if idea.review_count != 1 }})</span>
+                <span class="muted"> ({{ idea.review_count }} {{ t('ideas.review_singular') if idea.review_count == 1 else t('ideas.review_plural') }})</span>
               </div>
             </a>
           {% endfor %}
@@ -172,11 +172,11 @@
   {% else %}
     <div class="hero">
       <div class="hero-copy">
-        <h1>Something to print. Someone nearby who can print it.</h1>
-        <p>Post an idea with what it needs, get matched with a 3D printer close to you, and pick it up once it's ready.</p>
+        <h1>{{ t('home.hero_title') }}</h1>
+        <p>{{ t('home.hero_sub') }}</p>
         <div class="cta-row">
-          <a class="cta-primary" href="{{ url_for('login') }}">Get started</a>
-          <a class="cta-secondary" href="{{ url_for('login') }}">Log in</a>
+          <a class="cta-primary" href="{{ url_for('login') }}">{{ t('home.get_started') }}</a>
+          <a class="cta-secondary" href="{{ url_for('login') }}">{{ t('home.login') }}</a>
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">
@@ -204,24 +204,24 @@
     <div class="how-it-works">
       <div class="step">
         <span class="num">01</span>
-        <h3>Post what you need printed</h3>
-        <p>Technology, material, size, and any other specs it requires.</p>
+        <h3>{{ t('home.step1_title') }}</h3>
+        <p>{{ t('home.step1_sub') }}</p>
       </div>
       <div class="step">
         <span class="num">02</span>
-        <h3>Get matched with a nearby printer</h3>
-        <p>We show printers close to you that can handle the job, closest first.</p>
+        <h3>{{ t('home.step2_title') }}</h3>
+        <p>{{ t('home.step2_sub') }}</p>
       </div>
       <div class="step">
         <span class="num">03</span>
-        <h3>Pick it up once it's ready</h3>
-        <p>Chat with the owner, track the status, collect it when it's done.</p>
+        <h3>{{ t('home.step3_title') }}</h3>
+        <p>{{ t('home.step3_sub') }}</p>
       </div>
     </div>
 
     <div class="stats">
-      <div><strong>{{ printer_count }}</strong> printers listed</div>
-      <div><strong>{{ project_count }}</strong> ideas posted</div>
+      <div><strong>{{ printer_count }}</strong> {{ t('home.stat_printers') }}</div>
+      <div><strong>{{ project_count }}</strong> {{ t('home.stat_ideas') }}</div>
     </div>
   {% endif %}
 </div>

@@ -1,35 +1,35 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Ideas</h1>
-<a class="btn" href="{{ url_for('add_project') }}">+ Post an idea</a>
+<h1>{{ t('ideas.title') }}</h1>
+<a class="btn" href="{{ url_for('add_project') }}">{{ t('ideas.post_btn') }}</a>
 
 <form method="get" class="card" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
   <div>
-    <label>Technology</label>
+    <label>{{ t('ideas.filter_technology') }}</label>
     <select name="technology" onchange="this.form.submit()">
-      <option value="">Any</option>
-      {% for t in technologies %}
-        <option value="{{ t }}" {{ "selected" if filter_technology == t }}>{{ t }}</option>
+      <option value="">{{ t('ideas.filter_any') }}</option>
+      {% for tech in technologies %}
+        <option value="{{ tech }}" {{ "selected" if filter_technology == tech }}>{{ tech }}</option>
       {% endfor %}
     </select>
   </div>
   <div>
-    <label>Material</label>
+    <label>{{ t('ideas.filter_material') }}</label>
     <select name="material" onchange="this.form.submit()">
-      <option value="">Any</option>
+      <option value="">{{ t('ideas.filter_any') }}</option>
       {% for m in materials %}
         <option value="{{ m }}" {{ "selected" if filter_material == m }}>{{ m }}</option>
       {% endfor %}
     </select>
   </div>
   {% if filter_technology or filter_material %}
-    <a class="btn secondary" href="{{ url_for('list_projects') }}">Clear filters</a>
+    <a class="btn secondary" href="{{ url_for('list_projects') }}">{{ t('ideas.clear_filters') }}</a>
   {% endif %}
 </form>
 
 {% for p in projects %}
   <div class="card">
-    {% if p.image_data %}
+    {% if p.has_image %}
       <img src="{{ url_for('project_image', project_id=p.id) }}" alt="" style="max-width:160px; float:right; border-radius:6px; margin-left:1rem;">
     {% endif %}
     <h3><a href="{{ url_for('project_detail', project_id=p.id) }}">{{ p.title }}</a></h3>
@@ -39,25 +39,30 @@
       {{ p.creator_name }}
     </p>
     {% if p.rating.review_count > 0 %}
-      <p class="muted">★ {{ p.rating.avg_rating }}/5 ({{ p.rating.review_count }} review{{ "s" if p.rating.review_count != 1 }})</p>
+      <p class="muted">{{ t('ideas.reviews_summary', avg=p.rating.avg_rating, count=p.rating.review_count, reviews_word=(t('ideas.review_singular') if p.rating.review_count == 1 else t('ideas.review_plural'))) }}</p>
     {% endif %}
     <p class="muted">{{ p.description or "" }}</p>
     <span class="tag">{{ p.required_technology }}</span>
     {% for m in p.required_materials %}<span class="tag">{{ m }}</span>{% endfor %}
-    <p class="muted">Needs volume ≥ {{ p.required_build_volume_x_mm }} × {{ p.required_build_volume_y_mm }} × {{ p.required_build_volume_z_mm }} mm</p>
+    <p class="muted">{{ t('ideas.needs_volume', x=p.required_build_volume_x_mm, y=p.required_build_volume_y_mm, z=p.required_build_volume_z_mm) }}</p>
+
+    {% if p.has_file %}
+      <a class="btn" href="{{ url_for('project_download', project_id=p.id) }}">{{ t('ideas.print_idea') }}</a>
+    {% endif %}
+
     {% if person and p.creator_id == person.id %}
-      <a class="btn secondary" href="{{ url_for('edit_project', project_id=p.id) }}">Edit</a>
+      <a class="btn secondary" href="{{ url_for('edit_project', project_id=p.id) }}">{{ t('ideas.edit') }}</a>
       <form method="post" action="{{ url_for('delete_project', project_id=p.id) }}" style="display:inline"
-            onsubmit="return confirm('Delete this idea? This also removes its orders, chats, and reviews.');">
-        <button type="submit" class="danger">Delete</button>
+            onsubmit="return confirm('{{ t('ideas.delete_confirm') }}');">
+        <button type="submit" class="danger">{{ t('ideas.delete') }}</button>
       </form>
     {% else %}
       <form method="post" action="{{ url_for('contact_project_owner', project_id=p.id) }}" style="display:inline">
-        <button type="submit" class="secondary">Chat with owner</button>
+        <button type="submit" class="secondary">{{ t('ideas.chat_with_owner') }}</button>
       </form>
     {% endif %}
   </div>
 {% else %}
-  <p class="muted">No ideas yet{{ " matching those filters" if filter_technology or filter_material }}.</p>
+  <p class="muted">{{ t('ideas.none_yet', suffix=(t('ideas.matching_filters') if filter_technology or filter_material else '')) }}</p>
 {% endfor %}
 {% endblock %}

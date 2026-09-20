@@ -1,29 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ "Edit idea" if project else "Add an idea" }}</h1>
+<h1>{{ t('idea_form.edit_title') if project else t('idea_form.add_title') }}</h1>
 <form method="post" class="card" enctype="multipart/form-data">
-  <label>Title</label>
-  <input type="text" name="title" required placeholder="e.g. Articulated dragon toy" value="{{ project.title if project else '' }}">
+  <label>{{ t('idea_form.title_label') }}</label>
+  <input type="text" name="title" required placeholder="{{ t('idea_form.title_placeholder') }}" value="{{ project.title if project else '' }}">
 
-  <label>Description</label>
+  <label>{{ t('idea_form.description') }}</label>
   <textarea name="description" rows="3">{{ project.description if project else '' }}</textarea>
 
-  <label>Image (optional)</label>
-  {% if project and project.image_data %}
+  <label>{{ t('idea_form.image') }}</label>
+  {% if project and project.has_image %}
     <p><img src="{{ url_for('project_image', project_id=project.id) }}" alt="" style="max-width:220px; border-radius:6px; display:block; margin-bottom:0.4rem;"></p>
-    <label style="font-weight:400;"><input type="checkbox" name="remove_image"> Remove current image</label>
+    <label style="font-weight:400;"><input type="checkbox" name="remove_image"> {{ t('idea_form.remove_image') }}</label>
   {% endif %}
   <input type="file" name="image" accept="image/*">
-  <p class="muted" style="margin-top:0.2rem;">Uploading a new image replaces the current one. Max 5MB.</p>
+  <p class="muted" style="margin-top:0.2rem;">{{ t('idea_form.image_hint') }}</p>
 
-  <label>Required technology</label>
+  <label>{{ t('idea_form.project_file') }}</label>
+  {% if project and project.has_file %}
+    <p class="muted">{{ t('idea_form.current_file', name=project.file_name) }}</p>
+    <label style="font-weight:400;"><input type="checkbox" name="remove_file"> {{ t('idea_form.remove_file') }}</label>
+  {% endif %}
+  <input type="file" name="project_file" accept=".stl,.3mf,.obj,.step,.stp,.gcode,.gco">
+  <p class="muted" style="margin-top:0.2rem;">{{ t('idea_form.file_hint') }}</p>
+
+  <label>{{ t('idea_form.required_technology') }}</label>
   <select name="required_technology" required>
-    {% for t in technologies %}
-      <option value="{{ t }}" {{ "selected" if project and project.required_technology == t }}>{{ t }}</option>
+    {% for tech in technologies %}
+      <option value="{{ tech }}" {{ "selected" if project and project.required_technology == tech }}>{{ tech }}</option>
     {% endfor %}
   </select>
 
-  <label>Acceptable materials (any one of these is fine)</label>
+  <label>{{ t('idea_form.acceptable_materials') }}</label>
   <div class="checkboxes">
     {% for m in materials %}
       <label><input type="checkbox" name="required_materials" value="{{ m }}"
@@ -31,26 +39,26 @@
     {% endfor %}
   </div>
 
-  <label>Minimum build volume needed (mm)</label>
+  <label>{{ t('idea_form.min_build_volume') }}</label>
   <div style="display:flex; gap:0.5rem;">
     <input type="number" name="required_build_volume_x_mm" placeholder="X" required min="1" value="{{ project.required_build_volume_x_mm if project else '' }}">
     <input type="number" name="required_build_volume_y_mm" placeholder="Y" required min="1" value="{{ project.required_build_volume_y_mm if project else '' }}">
     <input type="number" name="required_build_volume_z_mm" placeholder="Z" required min="1" value="{{ project.required_build_volume_z_mm if project else '' }}">
   </div>
 
-  <label>Max nozzle diameter needed for detail level (mm, optional)</label>
+  <label>{{ t('idea_form.max_nozzle') }}</label>
   <select name="required_nozzle_diameter_max_mm">
-    <option value="">No preference</option>
+    <option value="">{{ t('idea_form.no_preference') }}</option>
     {% for n in nozzle_diameters %}
       <option value="{{ n }}" {{ "selected" if project and project.required_nozzle_diameter_max_mm and project.required_nozzle_diameter_max_mm|float == n }}>{{ n }}</option>
     {% endfor %}
   </select>
 
   <div class="checkboxes" style="margin-top:0.8rem;">
-    <label><input type="checkbox" name="required_heated_bed" {{ "checked" if project and project.required_heated_bed }}> Needs heated bed</label>
-    <label><input type="checkbox" name="required_enclosed" {{ "checked" if project and project.required_enclosed }}> Needs enclosed chamber</label>
+    <label><input type="checkbox" name="required_heated_bed" {{ "checked" if project and project.required_heated_bed }}> {{ t('idea_form.needs_heated_bed') }}</label>
+    <label><input type="checkbox" name="required_enclosed" {{ "checked" if project and project.required_enclosed }}> {{ t('idea_form.needs_enclosed') }}</label>
   </div>
 
-  <button type="submit">{{ "Save changes" if project else "Post idea" }}</button>
+  <button type="submit">{{ t('idea_form.save') if project else t('idea_form.post') }}</button>
 </form>
 {% endblock %}
