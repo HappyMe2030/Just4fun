@@ -118,6 +118,9 @@ def init_db():
             # additive, safe even if the table already existed
             cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS image_data BYTEA")
             cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS image_mime TEXT")
+            cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS file_data BYTEA")
+            cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS file_mime TEXT")
+            cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS file_name TEXT")
 
             # --- orders ---
             cur.execute(

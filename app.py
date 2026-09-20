@@ -12,13 +12,16 @@ from flask import (
 import db
 import notifications
 from constants import MATERIALS, NOZZLE_DIAMETERS_MM, TECHNOLOGIES
+from i18n import SUPPORTED_LANGUAGES, LANGUAGE_NAMES, detect_locale, t
 from images import InvalidImage, process_image
 from matching import find_nearby_printers, browse_printers, get_target_rating
 from tracing import init_tracing
 
 app = Flask(__name__)
 app.secret_key = os.environ["APP_SECRET_KEY"]
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5MB upload limit
+app.config["MAX_CONTENT_LENGTH"] = 55 * 1024 * 1024  # covers a resized image + a project file
+PROJECT_FILE_MAX_BYTES = 50 * 1024 * 1024  # 50MB cap on the project file itself
+PROJECT_FILE_EXTENSIONS = {".stl", ".3mf", ".obj", ".step", ".stp", ".gcode", ".gco"}
 
 AUTH0_DOMAIN = os.environ["AUTH0_DOMAIN"]
 AUTH0_CLIENT_ID = os.environ["AUTH0_CLIENT_ID"]
@@ -97,6 +100,7 @@ def get_or_create_person(sub, name, email, picture=None):
 
 @app.before_request
 def load_user():
+    g.locale = detect_locale()
     g.user = session.get("user")
     g.person = None
     if g.user:
@@ -108,10 +112,15 @@ def load_user():
                 g.person = cur.fetchone()
 
 
+app.jinja_env.globals["t"] = t
+
+
 @app.context_processor
 def inject_user():
     return {
         "user": g.get("user"), "person": g.get("person"),
+        "locale": g.get("locale"), "supported_languages": SUPPORTED_LANGUAGES,
+        "language_names": LANGUAGE_NAMES,
         "apm_rum_endpoint": APM_RUM_ENDPOINT,
         "apm_rum_public_data_key": APM_RUM_PUBLIC_DATA_KEY,
         "apm_rum_service_name": APM_RUM_SERVICE_NAME,
@@ -175,7 +184,8 @@ def home():
 
             cur.execute(
                 """
-                SELECT p.*, pe.name AS creator_name, pe.picture AS creator_picture,
+                SELECT p.id, p.title, (p.image_data IS NOT NULL) AS has_image,
+                       pe.name AS creator_name, pe.picture AS creator_picture,
                        AVG(r.rating)::numeric(3,2) AS avg_rating, COUNT(r.id) AS review_count
                 FROM projects p
                 JOIN people pe ON pe.id = p.creator_id
@@ -212,7 +222,7 @@ def update_location():
                 (lat, lng, address, g.person["id"]),
             )
         conn.commit()
-    flash("Location updated.")
+    flash(t("flash.location_updated"))
     return redirect(url_for("profile"))
 
 
@@ -300,7 +310,7 @@ def printer_detail(printer_id):
             )
             printer = cur.fetchone()
     if not printer:
-        flash("Printer not found.")
+        flash(t("flash.printer_not_found"))
         return redirect(url_for("list_printers"))
 
     is_owner = printer["owner_id"] == g.person["id"]
@@ -340,7 +350,7 @@ def add_printer():
                     ),
                 )
             conn.commit()
-        flash("Printer added.")
+        flash(t("flash.printer_added"))
         return redirect(url_for("list_printers"))
 
     return render_template(
@@ -358,10 +368,10 @@ def edit_printer(printer_id):
             cur.execute("SELECT * FROM printers WHERE id = %s", (printer_id,))
             printer = cur.fetchone()
     if not printer:
-        flash("Printer not found.")
+        flash(t("flash.printer_not_found"))
         return redirect(url_for("list_printers"))
     if printer["owner_id"] != g.person["id"]:
-        flash("You can only edit your own printers.")
+        flash(t("flash.own_printers_only_edit"))
         return redirect(url_for("list_printers"))
 
     if request.method == "POST":
@@ -392,7 +402,7 @@ def edit_printer(printer_id):
                     ),
                 )
             conn.commit()
-        flash("Printer updated.")
+        flash(t("flash.printer_updated"))
         return redirect(url_for("list_printers"))
 
     return render_template(
@@ -410,10 +420,10 @@ def delete_printer(printer_id):
             cur.execute("SELECT * FROM printers WHERE id = %s", (printer_id,))
             printer = cur.fetchone()
     if not printer:
-        flash("Printer not found.")
+        flash(t("flash.printer_not_found"))
         return redirect(url_for("list_printers"))
     if printer["owner_id"] != g.person["id"]:
-        flash("You can only delete your own printers.")
+        flash(t("flash.own_printers_only_delete"))
         return redirect(url_for("list_printers"))
 
     with db.get_conn() as conn:
@@ -433,7 +443,7 @@ def delete_printer(printer_id):
             cur.execute("DELETE FROM orders WHERE printer_id = %s", (printer_id,))
             cur.execute("DELETE FROM printers WHERE id = %s", (printer_id,))
         conn.commit()
-    flash("Printer deleted.")
+    flash(t("flash.printer_deleted"))
     return redirect(url_for("list_printers"))
 
 
@@ -459,7 +469,14 @@ def list_projects():
         with db.dict_cursor(conn) as cur:
             cur.execute(
                 f"""
-                SELECT p.*, pe.name AS creator_name, pe.picture AS creator_picture
+                SELECT p.id, p.creator_id, p.title, p.description, p.required_technology,
+                       p.required_materials, p.required_build_volume_x_mm,
+                       p.required_build_volume_y_mm, p.required_build_volume_z_mm,
+                       p.required_nozzle_diameter_max_mm, p.required_heated_bed,
+                       p.required_enclosed, p.created_at,
+                       (p.image_data IS NOT NULL) AS has_image,
+                       (p.file_data IS NOT NULL) AS has_file,
+                       pe.name AS creator_name, pe.picture AS creator_picture
                 FROM projects p
                 JOIN people pe ON pe.id = p.creator_id
                 {where_sql}
@@ -475,6 +492,23 @@ def list_projects():
         technologies=TECHNOLOGIES, materials=MATERIALS,
         filter_technology=filter_technology, filter_material=filter_material,
     )
+
+
+def _process_project_file(file_storage):
+    """Validates and reads an uploaded project file. Returns
+    (psycopg2.Binary, mime, filename) or raises ValueError with a
+    user-facing message."""
+    import os as _os
+    ext = _os.path.splitext(file_storage.filename)[1].lower()
+    if ext not in PROJECT_FILE_EXTENSIONS:
+        raise ValueError(
+            "Unsupported file type. Use one of: " + ", ".join(sorted(PROJECT_FILE_EXTENSIONS))
+        )
+    data = file_storage.read()
+    if len(data) > PROJECT_FILE_MAX_BYTES:
+        raise ValueError("File is too large (max 50MB).")
+    mime = file_storage.mimetype or "application/octet-stream"
+    return psycopg2.Binary(data), mime, file_storage.filename
 
 
 @app.route("/projects/add", methods=["GET", "POST"])
@@ -499,6 +533,19 @@ def add_project():
                 )
             image_data = psycopg2.Binary(resized_bytes)
 
+        file_data, file_mime, file_name = None, None, None
+        project_file = request.files.get("project_file")
+        if project_file and project_file.filename:
+            try:
+                file_data, file_mime, file_name = _process_project_file(project_file)
+            except ValueError as e:
+                flash(str(e))
+                return render_template(
+                    "project_form.html",
+                    technologies=TECHNOLOGIES, materials=MATERIALS,
+                    nozzle_diameters=NOZZLE_DIAMETERS_MM,
+                )
+
         with db.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -508,8 +555,9 @@ def add_project():
                         required_materials, required_build_volume_x_mm,
                         required_build_volume_y_mm, required_build_volume_z_mm,
                         required_nozzle_diameter_max_mm, required_heated_bed,
-                        required_enclosed, image_data, image_mime
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        required_enclosed, image_data, image_mime,
+                        file_data, file_mime, file_name
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         g.person["id"], f["title"], f.get("description"),
@@ -519,11 +567,11 @@ def add_project():
                         int(f["required_build_volume_z_mm"]),
                         max_nozzle,
                         "required_heated_bed" in f, "required_enclosed" in f,
-                        image_data, image_mime,
+                        image_data, image_mime, file_data, file_mime, file_name,
                     ),
                 )
             conn.commit()
-        flash("Idea posted.")
+        flash(t("flash.idea_posted"))
         return redirect(url_for("list_projects"))
 
     return render_template(
@@ -541,10 +589,10 @@ def edit_project(project_id):
             cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
             project = cur.fetchone()
     if not project:
-        flash("Idea not found.")
+        flash(t("flash.idea_not_found"))
         return redirect(url_for("list_projects"))
     if project["creator_id"] != g.person["id"]:
-        flash("You can only edit your own ideas.")
+        flash(t("flash.own_ideas_only_edit"))
         return redirect(url_for("list_projects"))
 
     if request.method == "POST":
@@ -568,6 +616,21 @@ def edit_project(project_id):
         elif "remove_image" in f:
             image_data, image_mime = None, None
 
+        file_data, file_mime, file_name = project["file_data"], project["file_mime"], project["file_name"]
+        project_file = request.files.get("project_file")
+        if project_file and project_file.filename:
+            try:
+                file_data, file_mime, file_name = _process_project_file(project_file)
+            except ValueError as e:
+                flash(str(e))
+                return render_template(
+                    "project_form.html",
+                    technologies=TECHNOLOGIES, materials=MATERIALS,
+                    nozzle_diameters=NOZZLE_DIAMETERS_MM, project=project,
+                )
+        elif "remove_file" in f:
+            file_data, file_mime, file_name = None, None, None
+
         with db.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -577,7 +640,8 @@ def edit_project(project_id):
                         required_materials=%s, required_build_volume_x_mm=%s,
                         required_build_volume_y_mm=%s, required_build_volume_z_mm=%s,
                         required_nozzle_diameter_max_mm=%s, required_heated_bed=%s,
-                        required_enclosed=%s, image_data=%s, image_mime=%s
+                        required_enclosed=%s, image_data=%s, image_mime=%s,
+                        file_data=%s, file_mime=%s, file_name=%s
                     WHERE id = %s
                     """,
                     (
@@ -588,12 +652,12 @@ def edit_project(project_id):
                         int(f["required_build_volume_z_mm"]),
                         max_nozzle,
                         "required_heated_bed" in f, "required_enclosed" in f,
-                        image_data, image_mime,
+                        image_data, image_mime, file_data, file_mime, file_name,
                         project_id,
                     ),
                 )
             conn.commit()
-        flash("Idea updated.")
+        flash(t("flash.idea_updated"))
         return redirect(url_for("project_detail", project_id=project_id))
 
     return render_template(
@@ -611,10 +675,10 @@ def delete_project(project_id):
             cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
             project = cur.fetchone()
     if not project:
-        flash("Idea not found.")
+        flash(t("flash.idea_not_found"))
         return redirect(url_for("list_projects"))
     if project["creator_id"] != g.person["id"]:
-        flash("You can only delete your own ideas.")
+        flash(t("flash.own_ideas_only_delete"))
         return redirect(url_for("list_projects"))
 
     with db.get_conn() as conn:
@@ -634,7 +698,7 @@ def delete_project(project_id):
             cur.execute("DELETE FROM orders WHERE project_id = %s", (project_id,))
             cur.execute("DELETE FROM projects WHERE id = %s", (project_id,))
         conn.commit()
-    flash("Idea deleted.")
+    flash(t("flash.idea_deleted"))
     return redirect(url_for("list_projects"))
 
 
@@ -652,6 +716,27 @@ def project_image(project_id):
     return Response(bytes(row["image_data"]), mimetype=row["image_mime"] or "application/octet-stream")
 
 
+@app.route("/projects/<int:project_id>/download")
+@login_required
+def project_download(project_id):
+    with db.get_conn() as conn:
+        with db.dict_cursor(conn) as cur:
+            cur.execute(
+                "SELECT file_data, file_mime, file_name FROM projects WHERE id = %s",
+                (project_id,),
+            )
+            row = cur.fetchone()
+    if not row or not row["file_data"]:
+        abort(404)
+    return Response(
+        bytes(row["file_data"]),
+        mimetype=row["file_mime"] or "application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{row["file_name"] or "project-file"}"'
+        },
+    )
+
+
 @app.route("/projects/<int:project_id>")
 @login_required
 def project_detail(project_id):
@@ -659,7 +744,14 @@ def project_detail(project_id):
         with db.dict_cursor(conn) as cur:
             cur.execute(
                 """
-                SELECT p.*, pe.name AS creator_name, pe.picture AS creator_picture
+                SELECT p.id, p.creator_id, p.title, p.description, p.required_technology,
+                       p.required_materials, p.required_build_volume_x_mm,
+                       p.required_build_volume_y_mm, p.required_build_volume_z_mm,
+                       p.required_nozzle_diameter_max_mm, p.required_heated_bed,
+                       p.required_enclosed, p.created_at,
+                       (p.image_data IS NOT NULL) AS has_image,
+                       (p.file_data IS NOT NULL) AS has_file, p.file_name,
+                       pe.name AS creator_name, pe.picture AS creator_picture
                 FROM projects p
                 JOIN people pe ON pe.id = p.creator_id
                 WHERE p.id = %s
@@ -668,7 +760,7 @@ def project_detail(project_id):
             )
             project = cur.fetchone()
     if not project:
-        flash("Idea not found.")
+        flash(t("flash.idea_not_found"))
         return redirect(url_for("list_projects"))
 
     has_location = g.person["latitude"] is not None
@@ -742,7 +834,7 @@ def create_order():
             f"on the printer \"{info['printer_name']}\".\n\nView it here: {order_url}",
         )
 
-    flash("Request sent to the printer owner.")
+    flash(t("flash.order_sent"))
     return redirect(url_for("list_orders"))
 
 
@@ -772,7 +864,7 @@ def order_transition(order_id, new_status):
             )
             order = cur.fetchone()
             if not order:
-                flash("Order not found.")
+                flash(t("flash.order_not_found"))
                 return redirect(url_for("list_orders"))
 
             is_requester = order["requester_id"] == g.person["id"]
@@ -783,7 +875,7 @@ def order_transition(order_id, new_status):
                 or (allowed_role == "requester" and is_requester)
             )
             if not has_permission:
-                flash("You can't perform that action on this order.")
+                flash(t("flash.order_action_denied"))
                 return redirect(url_for("list_orders"))
 
             cur.execute(
@@ -830,10 +922,10 @@ def get_order_for_participant(order_id):
 def delete_order(order_id):
     order, roles = get_order_for_participant(order_id)
     if not order:
-        flash("Order not found.")
+        flash(t("flash.order_not_found"))
         return redirect(url_for("list_orders"))
     if "requester" not in roles:
-        flash("Only the person who requested the print can delete this order.")
+        flash(t("flash.own_orders_only_delete"))
         return redirect(url_for("list_orders"))
 
     with db.get_conn() as conn:
@@ -843,7 +935,7 @@ def delete_order(order_id):
             cur.execute("DELETE FROM chat_reads WHERE order_id = %s", (order_id,))
             cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
         conn.commit()
-    flash("Order deleted.")
+    flash(t("flash.order_deleted"))
     return redirect(url_for("list_orders"))
 
 
@@ -852,7 +944,7 @@ def delete_order(order_id):
 def order_chat(order_id):
     order, roles = get_order_for_participant(order_id)
     if not order:
-        flash("You don't have access to that order's chat.")
+        flash(t("flash.no_chat_access"))
         return redirect(url_for("list_orders"))
     return render_template("chat.html", order=order, roles=roles)
 
@@ -1007,10 +1099,10 @@ def _review_target_id(order, target_type):
 def review_order(order_id):
     order, roles = get_order_for_participant(order_id)
     if not order:
-        flash("You don't have access to that order.")
+        flash(t("flash.no_order_access"))
         return redirect(url_for("list_orders"))
     if order["status"] != "completed":
-        flash("You can only review an order once it's completed.")
+        flash(t("flash.review_completed_only"))
         return redirect(url_for("list_orders"))
 
     with db.get_conn() as conn:
@@ -1030,9 +1122,9 @@ def review_order(order_id):
 
     targets = []
     labels = {
-        "printer": f"Rate the printer ({order['printer_name']})",
-        "project": f"Rate the idea ({order['project_title']})",
-        "customer": "Rate the customer",
+        "printer": t("review.rate_printer", name=order["printer_name"]),
+        "project": t("review.rate_idea", name=order["project_title"]),
+        "customer": t("review.rate_customer"),
     }
     for target_type in target_types:
         targets.append({
@@ -1051,7 +1143,7 @@ def submit_review(order_id, target_type):
     if not order:
         abort(403)
     if order["status"] != "completed":
-        flash("You can only review an order once it's completed.")
+        flash(t("flash.review_completed_only"))
         return redirect(url_for("list_orders"))
     allowed_types = set()
     for role in roles:
@@ -1062,7 +1154,7 @@ def submit_review(order_id, target_type):
     rating = int(request.form["rating"])
     comment = request.form.get("comment", "").strip() or None
     if rating < 1 or rating > 5:
-        flash("Rating must be between 1 and 5.")
+        flash(t("flash.review_rating_range"))
         return redirect(url_for("review_order", order_id=order_id))
 
     target_id = _review_target_id(order, target_type)
@@ -1078,7 +1170,7 @@ def submit_review(order_id, target_type):
                 (order_id, g.person["id"], target_type, target_id, rating, comment),
             )
         conn.commit()
-    flash("Thanks for the feedback!")
+    flash(t("flash.review_thanks"))
     return redirect(url_for("review_order", order_id=order_id))
 
 
@@ -1126,10 +1218,10 @@ def contact_printer_owner(printer_id):
             cur.execute("SELECT * FROM printers WHERE id = %s", (printer_id,))
             printer = cur.fetchone()
     if not printer:
-        flash("Printer not found.")
+        flash(t("flash.printer_not_found"))
         return redirect(url_for("list_printers"))
     if printer["owner_id"] == g.person["id"]:
-        flash("That's your own printer.")
+        flash(t("flash.own_printer_notice"))
         return redirect(url_for("printer_detail", printer_id=printer_id))
 
     convo_id = _get_or_create_conversation("printer", printer_id, printer["owner_id"])
@@ -1144,10 +1236,10 @@ def contact_project_owner(project_id):
             cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
             project = cur.fetchone()
     if not project:
-        flash("Idea not found.")
+        flash(t("flash.idea_not_found"))
         return redirect(url_for("list_projects"))
     if project["creator_id"] == g.person["id"]:
-        flash("That's your own idea.")
+        flash(t("flash.own_idea_notice"))
         return redirect(url_for("project_detail", project_id=project_id))
 
     convo_id = _get_or_create_conversation("project", project_id, project["creator_id"])
@@ -1204,7 +1296,7 @@ def list_conversations():
 def conversation_view(conversation_id):
     convo, other_id = _get_conversation_for_participant(conversation_id)
     if not convo:
-        flash("You don't have access to that conversation.")
+        flash(t("flash.no_convo_access"))
         return redirect(url_for("list_conversations"))
     with db.get_conn() as conn:
         with db.dict_cursor(conn) as cur:

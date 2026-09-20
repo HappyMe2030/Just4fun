@@ -1,0 +1,359 @@
+"""
+Minimal i18n: detects the browser's language from the Accept-Language
+header and serves translated UI text via the `t()` Jinja global. A manual
+override (?lang=xx, remembered in the session) lets a person pick a
+different language than their browser reports.
+
+To add a new language: add its code to SUPPORTED_LANGUAGES and a matching
+dict to TRANSLATIONS (missing keys fall back to English automatically).
+"""
+from flask import g, request, session
+
+SUPPORTED_LANGUAGES = ["en", "it"]
+DEFAULT_LANGUAGE = "en"
+
+LANGUAGE_NAMES = {"en": "English", "it": "Italiano"}
+
+
+def detect_locale():
+    override = request.args.get("lang")
+    if override in SUPPORTED_LANGUAGES:
+        session["lang"] = override
+    if session.get("lang") in SUPPORTED_LANGUAGES:
+        return session["lang"]
+    return request.accept_languages.best_match(SUPPORTED_LANGUAGES) or DEFAULT_LANGUAGE
+
+
+def t(key, **kwargs):
+    locale = getattr(g, "locale", DEFAULT_LANGUAGE)
+    text = TRANSLATIONS.get(locale, {}).get(key) or TRANSLATIONS[DEFAULT_LANGUAGE].get(key, key)
+    return text.format(**kwargs) if kwargs else text
+
+
+TRANSLATIONS = {
+    "en": {
+        # nav
+        "nav.ideas": "Ideas", "nav.printers": "Printers", "nav.messages": "Messages",
+        "nav.orders": "Orders", "nav.profile": "Profile", "nav.logout": "Log out ({name})",
+        "nav.login": "Log in / Sign up", "nav.brand": "3DPrint Marketplace",
+
+        # home
+        "home.hi": "Hi, {name}", "home.hi_sub": "Pick up where you left off — browse what's around you or list something new.",
+        "home.set_location": "Set your location", "home.set_location_sub": "We use it to show you printers and requests nearby.",
+        "home.set_location_btn": "Set my location",
+        "home.post_idea_title": "Post your idea!", "home.post_idea_sub": "Post it with the specs it needs, and see who nearby can make it.",
+        "home.post_idea_btn": "Post an idea",
+        "home.own_printer_title": "Own a 3D printer?", "home.own_printer_sub": "List its capabilities so people nearby can order prints from it.",
+        "home.add_printer_btn": "Add your printer",
+        "home.pick_idea_title": "Pick up an idea!", "home.pick_idea_sub": "The best-rated ideas from the community — ready for a printer near you.",
+        "home.hero_title": "Something to print. Someone nearby who can print it.",
+        "home.hero_sub": "Post an idea with what it needs, get matched with a 3D printer close to you, and pick it up once it's ready.",
+        "home.get_started": "Get started", "home.login": "Log in",
+        "home.step1_title": "Post what you need printed", "home.step1_sub": "Technology, material, size, and any other specs it requires.",
+        "home.step2_title": "Get matched with a nearby printer", "home.step2_sub": "We show printers close to you that can handle the job, closest first.",
+        "home.step3_title": "Pick it up once it's ready", "home.step3_sub": "Chat with the owner, track the status, collect it when it's done.",
+        "home.stat_printers": "printers listed", "home.stat_ideas": "ideas posted",
+
+        # printers
+        "printers.title": "Printers", "printers.add_btn": "+ Add a printer",
+        "printers.your_printers": "Your printers", "printers.none_yet": "You haven't listed any printers yet.",
+        "printers.near_you": "Printers near you", "printers.set_location_prompt": "Set your {link} to browse nearby printers.",
+        "printers.location_link": "location",
+        "printers.none_found": "No printers found{suffix}.", "printers.matching_filters": " matching those filters",
+        "printers.filter_technology": "Technology", "printers.filter_material": "Material", "printers.filter_any": "Any",
+        "printers.clear_filters": "Clear filters",
+        "printers.owner": "Owner: {name}", "printers.build_volume": "Build volume: {x} × {y} × {z} mm",
+        "printers.nozzle": "Nozzle {v}mm", "printers.heated_bed": "Heated bed", "printers.enclosed": "Enclosed",
+        "printers.no_reviews": "No reviews yet", "printers.reviews_summary": "★ {avg}/5 ({count} {reviews_word})",
+        "printers.see_reviews": "see reviews", "printers.see_all_reviews": "see all reviews",
+        "printers.review_singular": "review", "printers.review_plural": "reviews",
+        "printers.edit": "Edit", "printers.delete": "Delete",
+        "printers.delete_confirm": "Delete this printer? This also removes its orders, chats, and reviews.",
+        "printers.chat_with_owner": "Chat with owner",
+        "printers.prev": "← Previous", "printers.next": "Next →", "printers.page_of": "Page {page} of {total}",
+        "printers.km_away": "— {km} km away",
+
+        # printer form
+        "printer_form.add_title": "Add a printer", "printer_form.edit_title": "Edit printer",
+        "printer_form.set_location_first": "Set your {link} first — new printers default to it, and you can adjust below.",
+        "printer_form.name": "Name", "printer_form.description": "Description", "printer_form.technology": "Technology",
+        "printer_form.materials": "Materials supported", "printer_form.nozzle_diameter": "Nozzle diameter (mm, if FDM)",
+        "printer_form.na": "N/A", "printer_form.build_volume": "Build volume (mm)",
+        "printer_form.max_temp": "Max nozzle temp (°C, optional)",
+        "printer_form.address": "Address", "printer_form.address_placeholder": "e.g. 123 Main St, Springfield",
+        "printer_form.find_address": "Find this address", "printer_form.use_current_location": "Use my current location instead",
+        "printer_form.save": "Save changes", "printer_form.add": "Add printer",
+        "printer_form.geocode_enter_address": "Enter an address first.", "printer_form.geocode_looking": "Looking up address…",
+        "printer_form.geocode_found": "Found: {name}", "printer_form.geocode_error": "Could not find that address.",
+        "printer_form.geocode_failed": "Something went wrong looking up that address.",
+        "printer_form.locate_unsupported": "Geolocation is not supported by your browser.",
+        "printer_form.locate_progress": "Locating…", "printer_form.locate_found": "Location found.",
+        "printer_form.locate_error": "Could not get location: {err}",
+        "printer_form.submit_validation": "Find an address or use your current location first.",
+
+        # printer detail
+        "printer_detail.owned_by": "Owned by {name}", "printer_detail.located_near": "Located near: {address}",
+        "printer_detail.max_temp": "Max nozzle temp {v}°C", "printer_detail.reviews_heading": "Reviews",
+        "printer_detail.no_written_reviews": "No written reviews yet.",
+
+        # ideas / projects
+        "ideas.title": "Ideas", "ideas.post_btn": "+ Post an idea",
+        "ideas.filter_technology": "Technology", "ideas.filter_material": "Material", "ideas.filter_any": "Any",
+        "ideas.clear_filters": "Clear filters", "ideas.none_yet": "No ideas yet{suffix}.",
+        "ideas.matching_filters": " matching those filters",
+        "ideas.needs_volume": "Needs volume ≥ {x} × {y} × {z} mm",
+        "ideas.edit": "Edit", "ideas.delete": "Delete",
+        "ideas.delete_confirm": "Delete this idea? This also removes its orders, chats, and reviews.",
+        "ideas.chat_with_owner": "Chat with owner",
+        "ideas.reviews_summary": "★ {avg}/5 ({count} {reviews_word})",
+        "ideas.review_singular": "review", "ideas.review_plural": "reviews",
+        "ideas.print_idea": "🖨️ Print this idea", "ideas.no_file": "No file uploaded yet",
+
+        # idea form
+        "idea_form.add_title": "Add an idea", "idea_form.edit_title": "Edit idea",
+        "idea_form.title_label": "Title", "idea_form.title_placeholder": "e.g. Articulated dragon toy",
+        "idea_form.description": "Description", "idea_form.image": "Image (optional)",
+        "idea_form.remove_image": "Remove current image", "idea_form.image_hint": "Uploading a new image replaces the current one. Max 5MB.",
+        "idea_form.project_file": "Project file (optional)", "idea_form.current_file": "Current file: {name}",
+        "idea_form.remove_file": "Remove current file",
+        "idea_form.file_hint": "STL, 3MF, OBJ, STEP, or G-code. Max 50MB. Uploading a new file replaces the current one.",
+        "idea_form.required_technology": "Required technology", "idea_form.acceptable_materials": "Acceptable materials (any one of these is fine)",
+        "idea_form.min_build_volume": "Minimum build volume needed (mm)",
+        "idea_form.max_nozzle": "Max nozzle diameter needed for detail level (mm, optional)",
+        "idea_form.no_preference": "No preference", "idea_form.needs_heated_bed": "Needs heated bed",
+        "idea_form.needs_enclosed": "Needs enclosed chamber",
+        "idea_form.save": "Save changes", "idea_form.post": "Post idea",
+
+        # idea detail
+        "idea_detail.posted_by": "Posted by {name}", "idea_detail.edit_idea": "Edit idea",
+        "idea_detail.printers_near_you": "Printers near you",
+        "idea_detail.set_location_prompt": "Set your {link} to see nearby printers.",
+        "idea_detail.none_found": "No printers found within range yet.",
+        "idea_detail.mismatch_heading": "⚠ Doesn't fully match this idea:",
+        "idea_detail.meets_requirements": "✓ Meets all requirements",
+        "idea_detail.request_anyway": "Request anyway", "idea_detail.request_printer": "Request this printer",
+        "idea_detail.reviews_summary": "★ {avg}/5 ({count} {reviews_word})",
+        "idea_detail.review_singular": "review", "idea_detail.review_plural": "reviews",
+        "idea_detail.download_file": "⬇ Download project file ({name})",
+        "idea_detail.nozzle_max": "Nozzle ≤ {v}mm",
+
+        # orders
+        "orders.title": "Orders", "orders.received": "Orders you received", "orders.placed": "Orders you placed",
+        "orders.none_received": "No requests for your printers yet.", "orders.none_placed": "You haven't requested any prints yet.",
+        "orders.printer_owner": "Printer: {printer} (owner: {owner})",
+        "orders.printer_requester": "Printer: {printer} · Requested by: {requester}",
+        "orders.chat": "Chat", "orders.chat_with_requester": "Chat with requester", "orders.new_badge": "{count} new",
+        "orders.ready_pickup": "Ready for pickup at the printer's location.", "orders.mark_picked_up": "Mark picked up",
+        "orders.cancel": "Cancel request", "orders.rate_review": "Rate & review",
+        "orders.accept": "Accept", "orders.reject": "Reject", "orders.start_printing": "Start printing",
+        "orders.mark_ready": "Mark ready for pickup",
+        "orders.customer_rating": "Customer rating: ★ {avg}/5 ({count} {reviews_word})",
+        "orders.customer_no_reviews": "Customer has no prior reviews yet.",
+        "orders.delete": "Delete", "orders.delete_confirm": "Delete this order? This also removes its chat and reviews.",
+
+        # chat / conversation
+        "chat.back_to_orders": "Back to orders", "chat.title": "Chat — {project}",
+        "chat.printer_label": "Printer: {name}", "chat.status_label": "Status:",
+        "chat.loading": "Loading messages…", "chat.no_messages": "No messages yet — say hello.",
+        "chat.placeholder": "Write a message…", "chat.send": "Send", "chat.you": "You",
+        "convo.title": "Chat with {name}", "convo.about": "About: {name}", "convo.back": "Back to messages",
+        "convo_list.title": "Messages", "convo_list.none": "No conversations yet — start one from a printer's or idea's page.",
+        "convo_list.about_printer": "About the printer: {name}", "convo_list.about_idea": "About the idea: {name}",
+
+        # review form
+        "review.title": "Rate this order", "review.subtitle": "{project} — printed on {printer}",
+        "review.rating_label": "Rating", "review.choose_rating": "Choose a rating",
+        "review.star_singular": "star", "review.star_plural": "stars", "review.comment_label": "Comment (optional)",
+        "review.update": "Update review", "review.submit": "Submit review", "review.back_to_orders": "Back to orders",
+        "review.rate_printer": "Rate the printer ({name})", "review.rate_idea": "Rate the idea ({name})",
+        "review.rate_customer": "Rate the customer",
+
+        # profile
+        "profile.title": "Your profile", "profile.name": "Name:", "profile.email": "Email:", "profile.location": "Location:",
+        "profile.not_set": "Not set", "profile.set_location_heading": "Set your location",
+        "profile.address": "Address", "profile.address_placeholder": "e.g. 123 Main St, Springfield",
+        "profile.find_address": "Find this address", "profile.use_current_location": "Use my current location instead",
+        "profile.save_location": "Save location",
+        "profile.geocode_enter_address": "Enter an address first.", "profile.geocode_looking": "Looking up address…",
+        "profile.geocode_found": "Found: {name}", "profile.geocode_error": "Could not find that address.",
+        "profile.geocode_failed": "Something went wrong looking up that address.",
+        "profile.locate_unsupported": "Geolocation is not supported by your browser.",
+        "profile.locate_progress": "Locating…", "profile.locate_found_confirm": "Location found — click \"Save location\" to confirm.",
+        "profile.locate_error": "Could not get location: {err}",
+        "profile.submit_validation": "Find an address or use your current location first.",
+
+        # flash messages (server-side)
+        "flash.location_updated": "Location updated.", "flash.printer_added": "Printer added.",
+        "flash.printer_updated": "Printer updated.", "flash.printer_deleted": "Printer deleted.",
+        "flash.printer_not_found": "Printer not found.", "flash.own_printers_only_edit": "You can only edit your own printers.",
+        "flash.own_printers_only_delete": "You can only delete your own printers.",
+        "flash.idea_posted": "Idea posted.", "flash.idea_updated": "Idea updated.", "flash.idea_deleted": "Idea deleted.",
+        "flash.idea_not_found": "Idea not found.", "flash.own_ideas_only_edit": "You can only edit your own ideas.",
+        "flash.own_ideas_only_delete": "You can only delete your own ideas.",
+        "flash.order_sent": "Request sent to the printer owner.", "flash.order_not_found": "Order not found.",
+        "flash.order_action_denied": "You can't perform that action on this order.",
+        "flash.order_deleted": "Order deleted.", "flash.own_orders_only_delete": "Only the person who requested the print can delete this order.",
+        "flash.review_completed_only": "You can only review an order once it's completed.",
+        "flash.review_thanks": "Thanks for the feedback!", "flash.review_rating_range": "Rating must be between 1 and 5.",
+        "flash.no_order_access": "You don't have access to that order.",
+        "flash.no_chat_access": "You don't have access to that order's chat.",
+        "flash.own_printer_notice": "That's your own printer.", "flash.own_idea_notice": "That's your own idea.",
+        "flash.no_convo_access": "You don't have access to that conversation.",
+    },
+    "it": {
+        "nav.ideas": "Idee", "nav.printers": "Stampanti", "nav.messages": "Messaggi",
+        "nav.orders": "Ordini", "nav.profile": "Profilo", "nav.logout": "Esci ({name})",
+        "nav.login": "Accedi / Registrati", "nav.brand": "3DPrint Marketplace",
+
+        "home.hi": "Ciao, {name}", "home.hi_sub": "Riprendi da dove avevi lasciato — guarda cosa c'è vicino a te o pubblica qualcosa di nuovo.",
+        "home.set_location": "Imposta la tua posizione", "home.set_location_sub": "La usiamo per mostrarti stampanti e richieste nelle vicinanze.",
+        "home.set_location_btn": "Imposta la mia posizione",
+        "home.post_idea_title": "Pubblica la tua idea!", "home.post_idea_sub": "Pubblicala con le specifiche necessarie e scopri chi vicino a te può realizzarla.",
+        "home.post_idea_btn": "Pubblica un'idea",
+        "home.own_printer_title": "Possiedi una stampante 3D?", "home.own_printer_sub": "Indica le sue caratteristiche così le persone vicine potranno ordinare stampe.",
+        "home.add_printer_btn": "Aggiungi la tua stampante",
+        "home.pick_idea_title": "Scegli un'idea!", "home.pick_idea_sub": "Le idee meglio valutate dalla community — pronte per una stampante vicino a te.",
+        "home.hero_title": "Qualcosa da stampare. Qualcuno vicino che può stamparlo.",
+        "home.hero_sub": "Pubblica un'idea con ciò che richiede, trova una stampante 3D vicina a te e ritirala quando è pronta.",
+        "home.get_started": "Inizia ora", "home.login": "Accedi",
+        "home.step1_title": "Pubblica cosa vuoi stampare", "home.step1_sub": "Tecnologia, materiale, dimensioni e ogni altra specifica richiesta.",
+        "home.step2_title": "Trova una stampante vicina", "home.step2_sub": "Ti mostriamo le stampanti vicine in grado di realizzarlo, dalla più vicina.",
+        "home.step3_title": "Ritirala quando è pronta", "home.step3_sub": "Chatta con il proprietario, segui lo stato, ritirala a lavoro finito.",
+        "home.stat_printers": "stampanti registrate", "home.stat_ideas": "idee pubblicate",
+
+        "printers.title": "Stampanti", "printers.add_btn": "+ Aggiungi una stampante",
+        "printers.your_printers": "Le tue stampanti", "printers.none_yet": "Non hai ancora registrato nessuna stampante.",
+        "printers.near_you": "Stampanti vicino a te", "printers.set_location_prompt": "Imposta la tua {link} per esplorare le stampanti vicine.",
+        "printers.location_link": "posizione",
+        "printers.none_found": "Nessuna stampante trovata{suffix}.", "printers.matching_filters": " con questi filtri",
+        "printers.filter_technology": "Tecnologia", "printers.filter_material": "Materiale", "printers.filter_any": "Qualsiasi",
+        "printers.clear_filters": "Rimuovi filtri",
+        "printers.owner": "Proprietario: {name}", "printers.build_volume": "Volume di stampa: {x} × {y} × {z} mm",
+        "printers.nozzle": "Ugello {v}mm", "printers.heated_bed": "Piano riscaldato", "printers.enclosed": "Camera chiusa",
+        "printers.no_reviews": "Nessuna recensione", "printers.reviews_summary": "★ {avg}/5 ({count} {reviews_word})",
+        "printers.see_reviews": "vedi recensioni", "printers.see_all_reviews": "vedi tutte le recensioni",
+        "printers.review_singular": "recensione", "printers.review_plural": "recensioni",
+        "printers.edit": "Modifica", "printers.delete": "Elimina",
+        "printers.delete_confirm": "Eliminare questa stampante? Verranno rimossi anche i relativi ordini, chat e recensioni.",
+        "printers.chat_with_owner": "Chatta con il proprietario",
+        "printers.prev": "← Precedente", "printers.next": "Successiva →", "printers.page_of": "Pagina {page} di {total}",
+        "printers.km_away": "— a {km} km",
+
+        "printer_form.add_title": "Aggiungi una stampante", "printer_form.edit_title": "Modifica stampante",
+        "printer_form.set_location_first": "Imposta prima la tua {link} — le nuove stampanti la useranno come predefinita, modificabile qui sotto.",
+        "printer_form.name": "Nome", "printer_form.description": "Descrizione", "printer_form.technology": "Tecnologia",
+        "printer_form.materials": "Materiali supportati", "printer_form.nozzle_diameter": "Diametro ugello (mm, se FDM)",
+        "printer_form.na": "N/D", "printer_form.build_volume": "Volume di stampa (mm)",
+        "printer_form.max_temp": "Temperatura massima ugello (°C, opzionale)",
+        "printer_form.address": "Indirizzo", "printer_form.address_placeholder": "es. Via Roma 123, Milano",
+        "printer_form.find_address": "Trova questo indirizzo", "printer_form.use_current_location": "Usa la mia posizione attuale",
+        "printer_form.save": "Salva modifiche", "printer_form.add": "Aggiungi stampante",
+        "printer_form.geocode_enter_address": "Inserisci prima un indirizzo.", "printer_form.geocode_looking": "Ricerca indirizzo…",
+        "printer_form.geocode_found": "Trovato: {name}", "printer_form.geocode_error": "Impossibile trovare questo indirizzo.",
+        "printer_form.geocode_failed": "Si è verificato un problema nella ricerca dell'indirizzo.",
+        "printer_form.locate_unsupported": "La geolocalizzazione non è supportata dal tuo browser.",
+        "printer_form.locate_progress": "Localizzazione…", "printer_form.locate_found": "Posizione trovata.",
+        "printer_form.locate_error": "Impossibile ottenere la posizione: {err}",
+        "printer_form.submit_validation": "Trova un indirizzo o usa prima la tua posizione attuale.",
+
+        "printer_detail.owned_by": "Di proprietà di {name}", "printer_detail.located_near": "Situata vicino a: {address}",
+        "printer_detail.max_temp": "Temperatura massima ugello {v}°C", "printer_detail.reviews_heading": "Recensioni",
+        "printer_detail.no_written_reviews": "Ancora nessuna recensione scritta.",
+
+        "ideas.title": "Idee", "ideas.post_btn": "+ Pubblica un'idea",
+        "ideas.filter_technology": "Tecnologia", "ideas.filter_material": "Materiale", "ideas.filter_any": "Qualsiasi",
+        "ideas.clear_filters": "Rimuovi filtri", "ideas.none_yet": "Ancora nessuna idea{suffix}.",
+        "ideas.matching_filters": " con questi filtri",
+        "ideas.needs_volume": "Richiede volume ≥ {x} × {y} × {z} mm",
+        "ideas.edit": "Modifica", "ideas.delete": "Elimina",
+        "ideas.delete_confirm": "Eliminare questa idea? Verranno rimossi anche i relativi ordini, chat e recensioni.",
+        "ideas.chat_with_owner": "Chatta con il proprietario",
+        "ideas.reviews_summary": "★ {avg}/5 ({count} {reviews_word})",
+        "ideas.review_singular": "recensione", "ideas.review_plural": "recensioni",
+        "ideas.print_idea": "🖨️ Stampa questa idea", "ideas.no_file": "Nessun file caricato",
+
+        "idea_form.add_title": "Pubblica un'idea", "idea_form.edit_title": "Modifica idea",
+        "idea_form.title_label": "Titolo", "idea_form.title_placeholder": "es. Drago giocattolo snodabile",
+        "idea_form.description": "Descrizione", "idea_form.image": "Immagine (opzionale)",
+        "idea_form.remove_image": "Rimuovi immagine attuale", "idea_form.image_hint": "Caricando una nuova immagine sostituirai quella attuale. Massimo 5MB.",
+        "idea_form.project_file": "File del progetto (opzionale)", "idea_form.current_file": "File attuale: {name}",
+        "idea_form.remove_file": "Rimuovi file attuale",
+        "idea_form.file_hint": "STL, 3MF, OBJ, STEP o G-code. Massimo 50MB. Caricando un nuovo file sostituirai quello attuale.",
+        "idea_form.required_technology": "Tecnologia richiesta", "idea_form.acceptable_materials": "Materiali accettabili (basta che ne supporti uno)",
+        "idea_form.min_build_volume": "Volume di stampa minimo richiesto (mm)",
+        "idea_form.max_nozzle": "Diametro massimo ugello per il livello di dettaglio (mm, opzionale)",
+        "idea_form.no_preference": "Nessuna preferenza", "idea_form.needs_heated_bed": "Richiede piano riscaldato",
+        "idea_form.needs_enclosed": "Richiede camera chiusa",
+        "idea_form.save": "Salva modifiche", "idea_form.post": "Pubblica idea",
+
+        "idea_detail.posted_by": "Pubblicata da {name}", "idea_detail.edit_idea": "Modifica idea",
+        "idea_detail.printers_near_you": "Stampanti vicino a te",
+        "idea_detail.set_location_prompt": "Imposta la tua {link} per vedere le stampanti vicine.",
+        "idea_detail.none_found": "Ancora nessuna stampante trovata nel raggio.",
+        "idea_detail.mismatch_heading": "⚠ Non corrisponde del tutto a questa idea:",
+        "idea_detail.meets_requirements": "✓ Soddisfa tutti i requisiti",
+        "idea_detail.request_anyway": "Richiedi comunque", "idea_detail.request_printer": "Richiedi questa stampante",
+        "idea_detail.reviews_summary": "★ {avg}/5 ({count} {reviews_word})",
+        "idea_detail.review_singular": "recensione", "idea_detail.review_plural": "recensioni",
+        "idea_detail.download_file": "⬇ Scarica il file del progetto ({name})",
+        "idea_detail.nozzle_max": "Ugello ≤ {v}mm",
+
+        "orders.title": "Ordini", "orders.received": "Ordini ricevuti", "orders.placed": "Ordini effettuati",
+        "orders.none_received": "Ancora nessuna richiesta per le tue stampanti.", "orders.none_placed": "Non hai ancora richiesto nessuna stampa.",
+        "orders.printer_owner": "Stampante: {printer} (proprietario: {owner})",
+        "orders.printer_requester": "Stampante: {printer} · Richiesto da: {requester}",
+        "orders.chat": "Chat", "orders.chat_with_requester": "Chatta con il richiedente", "orders.new_badge": "{count} nuovi",
+        "orders.ready_pickup": "Pronto per il ritiro presso la stampante.", "orders.mark_picked_up": "Segna come ritirato",
+        "orders.cancel": "Annulla richiesta", "orders.rate_review": "Valuta e recensisci",
+        "orders.accept": "Accetta", "orders.reject": "Rifiuta", "orders.start_printing": "Avvia stampa",
+        "orders.mark_ready": "Segna pronto per il ritiro",
+        "orders.customer_rating": "Valutazione cliente: ★ {avg}/5 ({count} {reviews_word})",
+        "orders.customer_no_reviews": "Il cliente non ha ancora recensioni.",
+        "orders.delete": "Elimina", "orders.delete_confirm": "Eliminare questo ordine? Verranno rimossi anche la chat e le recensioni.",
+
+        "chat.back_to_orders": "Torna agli ordini", "chat.title": "Chat — {project}",
+        "chat.printer_label": "Stampante: {name}", "chat.status_label": "Stato:",
+        "chat.loading": "Caricamento messaggi…", "chat.no_messages": "Ancora nessun messaggio — scrivi qualcosa.",
+        "chat.placeholder": "Scrivi un messaggio…", "chat.send": "Invia", "chat.you": "Tu",
+        "convo.title": "Chat con {name}", "convo.about": "Riguardo: {name}", "convo.back": "Torna ai messaggi",
+        "convo_list.title": "Messaggi", "convo_list.none": "Ancora nessuna conversazione — iniziane una dalla pagina di una stampante o di un'idea.",
+        "convo_list.about_printer": "Riguardo la stampante: {name}", "convo_list.about_idea": "Riguardo l'idea: {name}",
+
+        "review.title": "Valuta questo ordine", "review.subtitle": "{project} — stampato su {printer}",
+        "review.rating_label": "Valutazione", "review.choose_rating": "Scegli una valutazione",
+        "review.star_singular": "stella", "review.star_plural": "stelle", "review.comment_label": "Commento (opzionale)",
+        "review.update": "Aggiorna recensione", "review.submit": "Invia recensione", "review.back_to_orders": "Torna agli ordini",
+        "review.rate_printer": "Valuta la stampante ({name})", "review.rate_idea": "Valuta l'idea ({name})",
+        "review.rate_customer": "Valuta il cliente",
+
+        "profile.title": "Il tuo profilo", "profile.name": "Nome:", "profile.email": "Email:", "profile.location": "Posizione:",
+        "profile.not_set": "Non impostata", "profile.set_location_heading": "Imposta la tua posizione",
+        "profile.address": "Indirizzo", "profile.address_placeholder": "es. Via Roma 123, Milano",
+        "profile.find_address": "Trova questo indirizzo", "profile.use_current_location": "Usa la mia posizione attuale",
+        "profile.save_location": "Salva posizione",
+        "profile.geocode_enter_address": "Inserisci prima un indirizzo.", "profile.geocode_looking": "Ricerca indirizzo…",
+        "profile.geocode_found": "Trovato: {name}", "profile.geocode_error": "Impossibile trovare questo indirizzo.",
+        "profile.geocode_failed": "Si è verificato un problema nella ricerca dell'indirizzo.",
+        "profile.locate_unsupported": "La geolocalizzazione non è supportata dal tuo browser.",
+        "profile.locate_progress": "Localizzazione…", "profile.locate_found_confirm": "Posizione trovata — clicca \"Salva posizione\" per confermare.",
+        "profile.locate_error": "Impossibile ottenere la posizione: {err}",
+        "profile.submit_validation": "Trova un indirizzo o usa prima la tua posizione attuale.",
+
+        "flash.location_updated": "Posizione aggiornata.", "flash.printer_added": "Stampante aggiunta.",
+        "flash.printer_updated": "Stampante aggiornata.", "flash.printer_deleted": "Stampante eliminata.",
+        "flash.printer_not_found": "Stampante non trovata.", "flash.own_printers_only_edit": "Puoi modificare solo le tue stampanti.",
+        "flash.own_printers_only_delete": "Puoi eliminare solo le tue stampanti.",
+        "flash.idea_posted": "Idea pubblicata.", "flash.idea_updated": "Idea aggiornata.", "flash.idea_deleted": "Idea eliminata.",
+        "flash.idea_not_found": "Idea non trovata.", "flash.own_ideas_only_edit": "Puoi modificare solo le tue idee.",
+        "flash.own_ideas_only_delete": "Puoi eliminare solo le tue idee.",
+        "flash.order_sent": "Richiesta inviata al proprietario della stampante.", "flash.order_not_found": "Ordine non trovato.",
+        "flash.order_action_denied": "Non puoi eseguire questa azione su questo ordine.",
+        "flash.order_deleted": "Ordine eliminato.", "flash.own_orders_only_delete": "Solo chi ha richiesto la stampa può eliminare questo ordine.",
+        "flash.review_completed_only": "Puoi recensire un ordine solo dopo il completamento.",
+        "flash.review_thanks": "Grazie per il tuo feedback!", "flash.review_rating_range": "La valutazione deve essere tra 1 e 5.",
+        "flash.no_order_access": "Non hai accesso a questo ordine.",
+        "flash.no_chat_access": "Non hai accesso alla chat di questo ordine.",
+        "flash.own_printer_notice": "Questa è la tua stampante.", "flash.own_idea_notice": "Questa è la tua idea.",
+        "flash.no_convo_access": "Non hai accesso a questa conversazione.",
+    },
+}
