@@ -71,6 +71,15 @@
   .step h3 { font-size: 1.05rem; margin: 0 0 0.3rem; }
   .step p { font-size: 0.92rem; color: #5b625f; margin: 0; line-height: 1.45; }
 
+  .examples { margin: 0.5rem 0 2.5rem; }
+  .examples h2 { font-size: 1.6rem; margin: 0 0 0.3rem; }
+  .examples > p { color: #5b625f; margin: 0 0 1.4rem; max-width: 60ch; font-size: 1rem; }
+  .examples-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.2rem; }
+  .example-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem; }
+  .example-card .emoji { font-size: 2.3rem; display: block; margin-bottom: 0.7rem; }
+  .example-card h3 { font-size: 1.05rem; margin: 0 0 0.4rem; }
+  .example-card p { font-size: 0.92rem; color: #5b625f; line-height: 1.5; margin: 0; }
+
   .stats { display: flex; gap: 2.5rem; padding: 1.6rem 0; color: #5b625f; font-size: 0.95rem; }
   .stats strong { font-family: 'Space Grotesk', sans-serif; color: var(--ink); font-size: 1.3rem; display: block; }
 
@@ -198,6 +207,33 @@
           <rect x="65.0" y="30" width="110" height="10.8" rx="1.5" class="layer" style="animation-delay:0.7s"/>
           <rect x="73.0" y="18" width="94" height="10.8" rx="1.5" class="layer" style="animation-delay:0.75s"/>
         </svg>
+      </div>
+    </div>
+
+    <div class="examples">
+      <h2>{{ t('home.examples_title') }}</h2>
+      <p>{{ t('home.examples_sub') }}</p>
+      <div class="examples-grid">
+        <div class="example-card">
+          <span class="emoji">{{ t('home.example1_emoji') }}</span>
+          <h3>{{ t('home.example1_title') }}</h3>
+          <p>{{ t('home.example1_sub') }}</p>
+        </div>
+        <div class="example-card">
+          <span class="emoji">{{ t('home.example2_emoji') }}</span>
+          <h3>{{ t('home.example2_title') }}</h3>
+          <p>{{ t('home.example2_sub') }}</p>
+        </div>
+        <div class="example-card">
+          <span class="emoji">{{ t('home.example3_emoji') }}</span>
+          <h3>{{ t('home.example3_title') }}</h3>
+          <p>{{ t('home.example3_sub') }}</p>
+        </div>
+        <div class="example-card">
+          <span class="emoji">{{ t('home.example4_emoji') }}</span>
+          <h3>{{ t('home.example4_title') }}</h3>
+          <p>{{ t('home.example4_sub') }}</p>
+        </div>
       </div>
     </div>
 
