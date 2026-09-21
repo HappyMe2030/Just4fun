@@ -1116,9 +1116,9 @@ def review_order(order_id):
     target_types = []
     for role in ("requester", "owner"):
         if role in roles:
-            for t in REVIEW_TARGETS_BY_ROLE[role]:
-                if t not in target_types:
-                    target_types.append(t)
+            for target_type_option in REVIEW_TARGETS_BY_ROLE[role]:
+                if target_type_option not in target_types:
+                    target_types.append(target_type_option)
 
     targets = []
     labels = {
