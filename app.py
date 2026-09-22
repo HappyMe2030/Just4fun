@@ -15,6 +15,7 @@ from constants import MATERIALS, NOZZLE_DIAMETERS_MM, TECHNOLOGIES
 from i18n import SUPPORTED_LANGUAGES, LANGUAGE_NAMES, detect_locale, t
 from images import InvalidImage, process_image
 from matching import find_nearby_printers, browse_printers, get_target_rating
+from printer_catalog import PRINTER_CATALOG
 from tracing import init_tracing
 
 app = Flask(__name__)
@@ -356,7 +357,7 @@ def add_printer():
     return render_template(
         "printer_form.html",
         technologies=TECHNOLOGIES, materials=MATERIALS,
-        nozzle_diameters=NOZZLE_DIAMETERS_MM,
+        nozzle_diameters=NOZZLE_DIAMETERS_MM, printer_catalog=PRINTER_CATALOG,
     )
 
 
@@ -408,7 +409,7 @@ def edit_printer(printer_id):
     return render_template(
         "printer_form.html",
         technologies=TECHNOLOGIES, materials=MATERIALS,
-        nozzle_diameters=NOZZLE_DIAMETERS_MM, printer=printer,
+        nozzle_diameters=NOZZLE_DIAMETERS_MM, printer=printer, printer_catalog=PRINTER_CATALOG,
     )
 
 
@@ -454,6 +455,7 @@ def delete_printer(printer_id):
 def list_projects():
     filter_technology = request.args.get("technology") or None
     filter_material = request.args.get("material") or None
+    search_query = request.args.get("q", "").strip() or None
 
     where_clauses = []
     params = {}
@@ -463,6 +465,11 @@ def list_projects():
     if filter_material:
         where_clauses.append("%(material)s = ANY(p.required_materials)")
         params["material"] = filter_material
+    if search_query:
+        where_clauses.append(
+            "(p.title ILIKE %(search)s OR p.description ILIKE %(search)s)"
+        )
+        params["search"] = f"%{search_query}%"
     where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     with db.get_conn() as conn:
@@ -491,6 +498,7 @@ def list_projects():
         "projects_list.html", projects=projects,
         technologies=TECHNOLOGIES, materials=MATERIALS,
         filter_technology=filter_technology, filter_material=filter_material,
+        search_query=search_query,
     )
 
 

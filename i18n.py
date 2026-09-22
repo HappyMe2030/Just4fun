@@ -104,6 +104,9 @@ TRANSLATIONS = {
 
         # printer form
         "printer_form.add_title": "Add a printer", "printer_form.edit_title": "Edit printer",
+        "printer_form.popular_model": "Popular printer model (optional)",
+        "printer_form.custom_model": "— Custom / other model —",
+        "printer_form.model_hint": "Picking a model fills in its specs below — you can still adjust anything before saving.",
         "printer_form.set_location_first": "Set your {link} first — new printers default to it, and you can adjust below.",
         "printer_form.name": "Name", "printer_form.description": "Description", "printer_form.technology": "Technology",
         "printer_form.materials": "Materials supported", "printer_form.nozzle_diameter": "Nozzle diameter (mm, if FDM)",
@@ -127,6 +130,8 @@ TRANSLATIONS = {
 
         # ideas / projects
         "ideas.title": "Ideas", "ideas.post_btn": "+ Post an idea",
+        "ideas.search_label": "Search", "ideas.search_placeholder": "Search by title or description…",
+        "ideas.search_btn": "🔍 Search",
         "ideas.filter_technology": "Technology", "ideas.filter_material": "Material", "ideas.filter_any": "Any",
         "ideas.clear_filters": "Clear filters", "ideas.none_yet": "No ideas yet{suffix}.",
         "ideas.matching_filters": " matching those filters",
@@ -301,6 +306,9 @@ TRANSLATIONS = {
         "printers.km_away": "— a {km} km",
 
         "printer_form.add_title": "Aggiungi una stampante", "printer_form.edit_title": "Modifica stampante",
+        "printer_form.popular_model": "Modello di stampante popolare (opzionale)",
+        "printer_form.custom_model": "— Modello personalizzato / altro —",
+        "printer_form.model_hint": "Scegliendo un modello compileremo le specifiche qui sotto — potrai comunque modificarle prima di salvare.",
         "printer_form.set_location_first": "Imposta prima la tua {link} — le nuove stampanti la useranno come predefinita, modificabile qui sotto.",
         "printer_form.name": "Nome", "printer_form.description": "Descrizione", "printer_form.technology": "Tecnologia",
         "printer_form.materials": "Materiali supportati", "printer_form.nozzle_diameter": "Diametro ugello (mm, se FDM)",
@@ -322,6 +330,8 @@ TRANSLATIONS = {
         "printer_detail.no_written_reviews": "Ancora nessuna recensione scritta.",
 
         "ideas.title": "Idee", "ideas.post_btn": "+ Pubblica un'idea",
+        "ideas.search_label": "Cerca", "ideas.search_placeholder": "Cerca per titolo o descrizione…",
+        "ideas.search_btn": "🔍 Cerca",
         "ideas.filter_technology": "Tecnologia", "ideas.filter_material": "Materiale", "ideas.filter_any": "Qualsiasi",
         "ideas.clear_filters": "Rimuovi filtri", "ideas.none_yet": "Ancora nessuna idea{suffix}.",
         "ideas.matching_filters": " con questi filtri",
