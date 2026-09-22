@@ -1,16 +1,19 @@
 {#
   Design notes (kept for future passes):
-  Color: --ink #1C2321 (warm charcoal), --bg #EDEFE9 (pale sage-grey, cooler
-    than the cliché warm cream), --accent #E1592A (hot-extruded PLA orange,
-    more saturated/red than a terracotta clay tone), --accent2 #2E6E7E
-    (blueprint teal), --line #D6D2C4.
-  Type: "Space Grotesk" for display/headline (technical, blueprint feel),
-    "IBM Plex Sans" for body (engineering-adjacent, distinct weight).
-  Layout: asymmetric hero, left-aligned copy + right-side SVG of a print
-    literally building up in cross-section layers, bottom to top — the
-    single orchestrated on-load animation, grounded in the actual subject
-    rather than decorative. "How it works" uses numbers because it truly
-    is a 3-step sequence.
+  Color: --ink #1C2321 (warm charcoal), --bg #EDEFE9 (pale sage-grey), --accent
+    #E1592A (hot-extruded PLA orange — doubles nicely as a familiar "shop CTA"
+    orange for e-commerce-literate visitors), --accent2 #2E6E7E (teal), --line
+    #D6D2C4.
+  Type: "Space Grotesk" for display/headline, "IBM Plex Sans" for body.
+  This pass leans the layout toward familiar online-shopping patterns (a
+  product-grid-like idea section, a single primary "shop now" CTA, trust
+  badges) for visitors who know Amazon-style shopping but not 3D printing —
+  so jargon (materials, build volume, technology) stays out of this page
+  entirely and lives only on the actual forms. The per-example hover reveal
+  teaches the two real flows (contact-the-owner vs. browse-and-order) without
+  more reading; the mission band explains *why* (skips shipping, keeps money
+  local) since that's the actual pitch for buying from a nearby maker instead
+  of a warehouse.
 #}
 {% extends "base.html" %}
 {% block content %}
@@ -27,15 +30,15 @@
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&display=swap');
 
   body { background: var(--bg); }
-  main { max-width: 1040px; }
+  main { max-width: 1080px; }
 
   .landing h1, .landing h2, .landing h3 { font-family: 'Space Grotesk', sans-serif; color: var(--ink); }
   .landing p, .landing a, .landing li { font-family: 'IBM Plex Sans', sans-serif; }
 
-  .hero { display: flex; align-items: center; gap: 2.5rem; padding: 2.5rem 0 3rem; }
+  .hero { display: flex; align-items: center; gap: 2.5rem; padding: 2.5rem 0 2.5rem; }
   .hero-copy { flex: 1 1 340px; }
-  .hero-copy h1 { font-size: 2.6rem; line-height: 1.12; font-weight: 700; margin: 0 0 1rem; max-width: 15ch; }
-  .hero-copy p { font-size: 1.08rem; line-height: 1.55; color: #454e4b; max-width: 42ch; margin: 0 0 1.6rem; }
+  .hero-copy h1 { font-size: 2.6rem; line-height: 1.12; font-weight: 700; margin: 0 0 1rem; max-width: 16ch; }
+  .hero-copy p { font-size: 1.08rem; line-height: 1.55; color: #454e4b; max-width: 46ch; margin: 0 0 1.6rem; }
   .hero-art { flex: 0 0 240px; }
   .hero-art svg { width: 100%; height: auto; }
   .layer {
@@ -53,52 +56,81 @@
     .layer { animation: none; opacity: 1; }
   }
 
-  .cta-row { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+  .cta-row { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; }
   .cta-primary, .cta-secondary {
-    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 0.98rem;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600;
     padding: 0.7rem 1.3rem; border-radius: 6px; text-decoration: none; display: inline-block;
   }
-  .cta-primary { background: var(--accent); color: white; }
+  .cta-primary { background: var(--accent); color: white; font-size: 1.05rem; padding: 0.85rem 1.8rem;
+                 box-shadow: 0 2px 0 var(--accent-ink); }
   .cta-primary:hover { background: var(--accent-ink); }
-  .cta-secondary { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+  .cta-secondary { background: transparent; color: var(--ink); border: 1.5px solid var(--line); font-size: 0.98rem; }
   .cta-secondary:hover { border-color: var(--ink); }
+  .trust-line { font-size: 0.86rem; color: #6b726e; }
 
+  /* mission band */
+  .mission { background: var(--accent2); color: white; border-radius: 14px;
+             padding: 2rem 2.2rem; margin: 0.5rem 0 2.5rem; }
+  .mission h2 { color: white; font-size: 1.5rem; margin: 0 0 0.6rem; }
+  .mission p { color: #e4f0ee; font-size: 1rem; line-height: 1.6; max-width: 70ch; margin: 0 0 1.2rem; }
+  .mission-badges { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .mission-badges span { background: rgba(255,255,255,0.14); border-radius: 20px;
+                          padding: 0.4rem 0.9rem; font-size: 0.86rem; font-weight: 600; }
+
+  /* how it works, retail framing */
+  .how-it-works-wrap { margin-bottom: 2.5rem; }
+  .how-it-works-wrap > h2 { font-size: 1.5rem; margin: 0 0 1.2rem; }
   .how-it-works { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-                   padding: 2.2rem 0; display: flex; gap: 2rem; flex-wrap: wrap; }
+                   padding: 2rem 0; display: flex; gap: 2rem; flex-wrap: wrap; }
   .step { flex: 1 1 220px; }
   .step .num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.85rem;
                color: var(--accent2); display: block; margin-bottom: 0.4rem; }
-  .step h3 { font-size: 1.05rem; margin: 0 0 0.3rem; }
+  .step h3 { font-size: 1.1rem; margin: 0 0 0.3rem; }
   .step p { font-size: 0.92rem; color: #5b625f; margin: 0; line-height: 1.45; }
 
+  /* use-case examples with hover-reveal steps */
   .examples { margin: 0.5rem 0 2.5rem; }
   .examples h2 { font-size: 1.6rem; margin: 0 0 0.3rem; }
   .examples > p { color: #5b625f; margin: 0 0 1.4rem; max-width: 60ch; font-size: 1rem; }
   .examples-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.2rem; }
-  .example-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem; }
+  .example-card { position: relative; background: var(--surface); border: 1px solid var(--line);
+                   border-radius: 12px; padding: 1.5rem; min-height: 210px; overflow: hidden;
+                   box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: box-shadow 0.15s ease; }
+  .example-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
   .example-card .emoji { font-size: 2.3rem; display: block; margin-bottom: 0.7rem; }
   .example-card h3 { font-size: 1.05rem; margin: 0 0 0.4rem; }
   .example-card p { font-size: 0.92rem; color: #5b625f; line-height: 1.5; margin: 0; }
+  .example-card .hint { position: absolute; bottom: 0.9rem; left: 1.5rem; right: 1.5rem;
+                         font-size: 0.78rem; color: var(--accent2); font-weight: 600; }
+  .example-steps { position: absolute; inset: 0; background: var(--ink); color: white;
+                    padding: 1.4rem 1.5rem; opacity: 0; pointer-events: none;
+                    transition: opacity 0.18s ease; display: flex; flex-direction: column; justify-content: center; }
+  .example-card:hover .example-steps { opacity: 1; pointer-events: auto; }
+  .example-steps ol { margin: 0; padding-left: 1.15rem; font-size: 0.88rem; line-height: 1.7; }
 
   .stats { display: flex; gap: 2.5rem; padding: 1.6rem 0; color: #5b625f; font-size: 0.95rem; }
   .stats strong { font-family: 'Space Grotesk', sans-serif; color: var(--ink); font-size: 1.3rem; display: block; }
 
-  .panels { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-top: 0.5rem; }
-  .panel { flex: 1 1 260px; background: var(--surface); border: 1px solid var(--line);
-           border-radius: 10px; padding: 1.6rem; }
-  .panel h3 { margin: 0 0 0.4rem; }
-  .panel p { color: #5b625f; font-size: 0.94rem; line-height: 1.5; margin: 0 0 1.1rem; }
-
-  .pick-idea { margin-top: 2.5rem; padding: 2rem; background: var(--ink); border-radius: 12px; }
-  .pick-idea h2 { color: var(--surface); font-size: 1.7rem; margin: 0 0 0.3rem; }
+  /* logged-in: idea shelf gets the visual weight, setup links stay small */
+  .pick-idea { margin: 0.5rem 0 2rem; padding: 2.2rem; background: var(--ink); border-radius: 14px; }
+  .pick-idea h2 { color: var(--surface); font-size: 1.9rem; margin: 0 0 0.3rem; }
   .pick-idea > p { color: #cfd4d1; margin: 0 0 1.4rem; }
-  .idea-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.1rem; }
+  .idea-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.1rem; }
   .idea-card { background: var(--surface); border-radius: 10px; overflow: hidden; text-decoration: none;
-               color: var(--ink); display: block; }
-  .idea-card img { width: 100%; height: 130px; object-fit: cover; display: block; }
-  .idea-card .idea-card-body { padding: 0.9rem 1rem; }
-  .idea-card h3 { font-size: 1rem; margin: 0 0 0.3rem; }
-  .idea-card .stars { color: var(--accent-ink); font-weight: 600; font-size: 0.9rem; }
+               color: var(--ink); display: block; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+               transition: transform 0.12s ease; }
+  .idea-card:hover { transform: translateY(-2px); }
+  .idea-card img { width: 100%; height: 120px; object-fit: cover; display: block; }
+  .idea-card .idea-card-body { padding: 0.8rem 0.9rem; }
+  .idea-card h3 { font-size: 0.95rem; margin: 0 0 0.3rem; }
+  .idea-card .stars { color: var(--accent-ink); font-weight: 600; font-size: 0.88rem; }
+  .see-all { display: inline-block; margin-top: 1.4rem; color: var(--surface); font-weight: 600;
+             text-decoration: none; border-bottom: 1.5px solid rgba(255,255,255,0.5); }
+  .see-all:hover { border-color: white; }
+
+  .quick-links { display: flex; gap: 1.8rem; flex-wrap: wrap; margin: 0 0 2.5rem; }
+  .quick-links a { color: var(--accent2); text-decoration: none; font-weight: 600; font-size: 0.92rem; }
+  .quick-links a:hover { text-decoration: underline; }
 
   @media (max-width: 700px) {
     .hero { flex-direction: column; }
@@ -136,27 +168,12 @@
     </div>
 
     {% if not has_location %}
-      <div class="panels" style="margin-bottom:1.5rem;">
-        <div class="panel">
-          <h3>{{ t('home.set_location') }}</h3>
-          <p>{{ t('home.set_location_sub') }}</p>
-          <a class="cta-primary" href="{{ url_for('profile') }}">{{ t('home.set_location_btn') }}</a>
-        </div>
+      <div class="mission" style="background: var(--accent-ink);">
+        <h2>{{ t('home.set_location') }}</h2>
+        <p>{{ t('home.set_location_sub') }}</p>
+        <a class="cta-primary" href="{{ url_for('profile') }}">{{ t('home.set_location_btn') }}</a>
       </div>
     {% endif %}
-
-    <div class="panels">
-      <div class="panel">
-        <h3>{{ t('home.post_idea_title') }}</h3>
-        <p>{{ t('home.post_idea_sub') }}</p>
-        <a class="cta-secondary" href="{{ url_for('add_project') }}">{{ t('home.post_idea_btn') }}</a>
-      </div>
-      <div class="panel">
-        <h3>{{ t('home.own_printer_title') }}</h3>
-        <p>{{ t('home.own_printer_sub') }}</p>
-        <a class="cta-secondary" href="{{ url_for('add_printer') }}">{{ t('home.add_printer_btn') }}</a>
-      </div>
-    </div>
 
     {% if top_ideas %}
       <div class="pick-idea">
@@ -176,17 +193,34 @@
             </a>
           {% endfor %}
         </div>
+        <a class="see-all" href="{{ url_for('list_projects') }}">{{ t('home.see_all_ideas') }}</a>
       </div>
     {% endif %}
+
+    <div class="quick-links">
+      <a href="{{ url_for('add_project') }}">{{ t('home.quick_post_idea') }}</a>
+      <a href="{{ url_for('add_printer') }}">{{ t('home.quick_add_printer') }}</a>
+    </div>
+
+    <div class="mission">
+      <h2>{{ t('home.mission_title') }}</h2>
+      <p>{{ t('home.mission_body') }}</p>
+      <div class="mission-badges">
+        <span>{{ t('home.mission_badge1') }}</span>
+        <span>{{ t('home.mission_badge2') }}</span>
+        <span>{{ t('home.mission_badge3') }}</span>
+      </div>
+    </div>
   {% else %}
     <div class="hero">
       <div class="hero-copy">
         <h1>{{ t('home.hero_title') }}</h1>
         <p>{{ t('home.hero_sub') }}</p>
         <div class="cta-row">
-          <a class="cta-primary" href="{{ url_for('login') }}">{{ t('home.get_started') }}</a>
+          <a class="cta-primary" href="{{ url_for('login') }}">{{ t('home.browse_cta') }}</a>
           <a class="cta-secondary" href="{{ url_for('login') }}">{{ t('home.login') }}</a>
         </div>
+        <p class="trust-line" style="margin-top:0.9rem;">{{ printer_count }} {{ t('home.stat_printers') }} · {{ project_count }} {{ t('home.stat_ideas') }}</p>
       </div>
       <div class="hero-art" aria-hidden="true">
         <svg viewBox="0 0 240 210" xmlns="http://www.w3.org/2000/svg">
@@ -210,48 +244,101 @@
       </div>
     </div>
 
+    <div class="mission">
+      <h2>{{ t('home.mission_title') }}</h2>
+      <p>{{ t('home.mission_body') }}</p>
+      <div class="mission-badges">
+        <span>{{ t('home.mission_badge1') }}</span>
+        <span>{{ t('home.mission_badge2') }}</span>
+        <span>{{ t('home.mission_badge3') }}</span>
+      </div>
+    </div>
+
     <div class="examples">
       <h2>{{ t('home.examples_title') }}</h2>
       <p>{{ t('home.examples_sub') }}</p>
       <div class="examples-grid">
         <div class="example-card">
-          <span class="emoji">{{ t('home.example1_emoji') }}</span>
-          <h3>{{ t('home.example1_title') }}</h3>
-          <p>{{ t('home.example1_sub') }}</p>
+          <div>
+            <span class="emoji">{{ t('home.example1_emoji') }}</span>
+            <h3>{{ t('home.example1_title') }}</h3>
+            <p>{{ t('home.example1_sub') }}</p>
+          </div>
+          <span class="hint">{{ t('home.hover_hint') }}</span>
+          <div class="example-steps">
+            <ol>
+              <li>{{ t('home.example1_step1') }}</li>
+              <li>{{ t('home.example1_step2') }}</li>
+              <li>{{ t('home.example1_step3') }}</li>
+            </ol>
+          </div>
         </div>
         <div class="example-card">
-          <span class="emoji">{{ t('home.example2_emoji') }}</span>
-          <h3>{{ t('home.example2_title') }}</h3>
-          <p>{{ t('home.example2_sub') }}</p>
+          <div>
+            <span class="emoji">{{ t('home.example2_emoji') }}</span>
+            <h3>{{ t('home.example2_title') }}</h3>
+            <p>{{ t('home.example2_sub') }}</p>
+          </div>
+          <span class="hint">{{ t('home.hover_hint') }}</span>
+          <div class="example-steps">
+            <ol>
+              <li>{{ t('home.example2_step1') }}</li>
+              <li>{{ t('home.example2_step2') }}</li>
+              <li>{{ t('home.example2_step3') }}</li>
+            </ol>
+          </div>
         </div>
         <div class="example-card">
-          <span class="emoji">{{ t('home.example3_emoji') }}</span>
-          <h3>{{ t('home.example3_title') }}</h3>
-          <p>{{ t('home.example3_sub') }}</p>
+          <div>
+            <span class="emoji">{{ t('home.example3_emoji') }}</span>
+            <h3>{{ t('home.example3_title') }}</h3>
+            <p>{{ t('home.example3_sub') }}</p>
+          </div>
+          <span class="hint">{{ t('home.hover_hint') }}</span>
+          <div class="example-steps">
+            <ol>
+              <li>{{ t('home.example3_step1') }}</li>
+              <li>{{ t('home.example3_step2') }}</li>
+              <li>{{ t('home.example3_step3') }}</li>
+            </ol>
+          </div>
         </div>
         <div class="example-card">
-          <span class="emoji">{{ t('home.example4_emoji') }}</span>
-          <h3>{{ t('home.example4_title') }}</h3>
-          <p>{{ t('home.example4_sub') }}</p>
+          <div>
+            <span class="emoji">{{ t('home.example4_emoji') }}</span>
+            <h3>{{ t('home.example4_title') }}</h3>
+            <p>{{ t('home.example4_sub') }}</p>
+          </div>
+          <span class="hint">{{ t('home.hover_hint') }}</span>
+          <div class="example-steps">
+            <ol>
+              <li>{{ t('home.example4_step1') }}</li>
+              <li>{{ t('home.example4_step2') }}</li>
+              <li>{{ t('home.example4_step3') }}</li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="how-it-works">
-      <div class="step">
-        <span class="num">01</span>
-        <h3>{{ t('home.step1_title') }}</h3>
-        <p>{{ t('home.step1_sub') }}</p>
-      </div>
-      <div class="step">
-        <span class="num">02</span>
-        <h3>{{ t('home.step2_title') }}</h3>
-        <p>{{ t('home.step2_sub') }}</p>
-      </div>
-      <div class="step">
-        <span class="num">03</span>
-        <h3>{{ t('home.step3_title') }}</h3>
-        <p>{{ t('home.step3_sub') }}</p>
+    <div class="how-it-works-wrap">
+      <h2>{{ t('home.how_title') }}</h2>
+      <div class="how-it-works">
+        <div class="step">
+          <span class="num">01</span>
+          <h3>{{ t('home.step1_title') }}</h3>
+          <p>{{ t('home.step1_sub') }}</p>
+        </div>
+        <div class="step">
+          <span class="num">02</span>
+          <h3>{{ t('home.step2_title') }}</h3>
+          <p>{{ t('home.step2_sub') }}</p>
+        </div>
+        <div class="step">
+          <span class="num">03</span>
+          <h3>{{ t('home.step3_title') }}</h3>
+          <p>{{ t('home.step3_sub') }}</p>
+        </div>
       </div>
     </div>
 
