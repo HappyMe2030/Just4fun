@@ -4,22 +4,41 @@
 {% if not printer and not person.latitude %}
   <div class="flash">{{ t('printer_form.set_location_first', link='<a href="' + url_for('profile') + '">' + t('printers.location_link') + '</a>') | safe }}</div>
 {% endif %}
+
+<div class="card">
+  <label>{{ t('printer_form.popular_model') }}</label>
+  <select id="model-select">
+    <option value="">{{ t('printer_form.custom_model') }}</option>
+    {% set ns = namespace(brand='') %}
+    {% for p in printer_catalog %}
+      {% if p.brand != ns.brand %}
+        {% if ns.brand != '' %}</optgroup>{% endif %}
+        <optgroup label="{{ p.brand }}">
+        {% set ns.brand = p.brand %}
+      {% endif %}
+      <option value="{{ loop.index0 }}">{{ p.model }} — {{ p.build_volume_x_mm }}×{{ p.build_volume_y_mm }}×{{ p.build_volume_z_mm }}mm</option>
+    {% endfor %}
+    </optgroup>
+  </select>
+  <p class="muted" style="margin-top:0.3rem;">{{ t('printer_form.model_hint') }}</p>
+</div>
+
 <form method="post" class="card">
   <label>{{ t('printer_form.name') }}</label>
-  <input type="text" name="name" required placeholder="e.g. Garage Bambu A1" value="{{ printer.name if printer else '' }}">
+  <input type="text" name="name" id="name-field" required placeholder="e.g. Garage Bambu A1" value="{{ printer.name if printer else '' }}">
 
   <label>{{ t('printer_form.description') }}</label>
   <textarea name="description" rows="2">{{ printer.description if printer else '' }}</textarea>
 
   <label>{{ t('printer_form.technology') }}</label>
-  <select name="technology" required>
+  <select name="technology" id="technology-field" required>
     {% for tech in technologies %}
       <option value="{{ tech }}" {{ "selected" if printer and printer.technology == tech }}>{{ tech }}</option>
     {% endfor %}
   </select>
 
   <label>{{ t('printer_form.materials') }}</label>
-  <div class="checkboxes">
+  <div class="checkboxes" id="materials-field">
     {% for m in materials %}
       <label><input type="checkbox" name="materials" value="{{ m }}"
         {{ "checked" if printer and m in printer.materials }}> {{ m }}</label>
@@ -27,7 +46,7 @@
   </div>
 
   <label>{{ t('printer_form.nozzle_diameter') }}</label>
-  <select name="nozzle_diameter_mm">
+  <select name="nozzle_diameter_mm" id="nozzle-field">
     <option value="">{{ t('printer_form.na') }}</option>
     {% for n in nozzle_diameters %}
       <option value="{{ n }}" {{ "selected" if printer and printer.nozzle_diameter_mm and printer.nozzle_diameter_mm|float == n }}>{{ n }}</option>
@@ -36,17 +55,17 @@
 
   <label>{{ t('printer_form.build_volume') }}</label>
   <div style="display:flex; gap:0.5rem;">
-    <input type="number" name="build_volume_x_mm" placeholder="X" required min="1" value="{{ printer.build_volume_x_mm if printer else '' }}">
-    <input type="number" name="build_volume_y_mm" placeholder="Y" required min="1" value="{{ printer.build_volume_y_mm if printer else '' }}">
-    <input type="number" name="build_volume_z_mm" placeholder="Z" required min="1" value="{{ printer.build_volume_z_mm if printer else '' }}">
+    <input type="number" name="build_volume_x_mm" id="bx-field" placeholder="X" required min="1" value="{{ printer.build_volume_x_mm if printer else '' }}">
+    <input type="number" name="build_volume_y_mm" id="by-field" placeholder="Y" required min="1" value="{{ printer.build_volume_y_mm if printer else '' }}">
+    <input type="number" name="build_volume_z_mm" id="bz-field" placeholder="Z" required min="1" value="{{ printer.build_volume_z_mm if printer else '' }}">
   </div>
 
   <label>{{ t('printer_form.max_temp') }}</label>
-  <input type="number" name="max_nozzle_temp_c" value="{{ printer.max_nozzle_temp_c if printer and printer.max_nozzle_temp_c else '' }}">
+  <input type="number" name="max_nozzle_temp_c" id="max-temp-field" value="{{ printer.max_nozzle_temp_c if printer and printer.max_nozzle_temp_c else '' }}">
 
   <div class="checkboxes" style="margin-top:0.8rem;">
-    <label><input type="checkbox" name="heated_bed" {{ "checked" if printer and printer.heated_bed }}> {{ t('printers.heated_bed') }}</label>
-    <label><input type="checkbox" name="enclosed" {{ "checked" if printer and printer.enclosed }}> {{ t('printers.enclosed') }}</label>
+    <label><input type="checkbox" name="heated_bed" id="heated-bed-field" {{ "checked" if printer and printer.heated_bed }}> {{ t('printers.heated_bed') }}</label>
+    <label><input type="checkbox" name="enclosed" id="enclosed-field" {{ "checked" if printer and printer.enclosed }}> {{ t('printers.enclosed') }}</label>
   </div>
 
   <label>{{ t('printer_form.address') }}</label>
@@ -63,6 +82,33 @@
 </form>
 
 <script>
+const CATALOG = {{ printer_catalog | tojson }};
+const nameField = document.getElementById('name-field');
+
+document.getElementById('model-select').addEventListener('change', function () {
+  if (this.value === '') return;
+  const p = CATALOG[parseInt(this.value, 10)];
+  if (!p) return;
+
+  document.getElementById('technology-field').value = p.technology;
+
+  document.querySelectorAll('#materials-field input[type=checkbox]').forEach(function (cb) {
+    cb.checked = p.materials.includes(cb.value);
+  });
+
+  document.getElementById('nozzle-field').value = p.nozzle_diameter_mm ? String(p.nozzle_diameter_mm) : '';
+  document.getElementById('bx-field').value = p.build_volume_x_mm;
+  document.getElementById('by-field').value = p.build_volume_y_mm;
+  document.getElementById('bz-field').value = p.build_volume_z_mm;
+  document.getElementById('max-temp-field').value = p.max_nozzle_temp_c || '';
+  document.getElementById('heated-bed-field').checked = !!p.heated_bed;
+  document.getElementById('enclosed-field').checked = !!p.enclosed;
+
+  if (!nameField.value.trim()) {
+    nameField.value = p.brand + ' ' + p.model;
+  }
+});
+
 const statusEl = document.getElementById('geocode-status');
 const latField = document.getElementById('lat-field');
 const lngField = document.getElementById('lng-field');

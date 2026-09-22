@@ -4,6 +4,14 @@
 <a class="btn" href="{{ url_for('add_project') }}">{{ t('ideas.post_btn') }}</a>
 
 <form method="get" class="card" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
+  <div style="flex:1 1 260px;">
+    <label>{{ t('ideas.search_label') }}</label>
+    <div style="display:flex; align-items:center; border:1px solid #ccc; border-radius:4px; padding:0 0.6rem; margin-top:0.25rem;">
+      <span aria-hidden="true">🔍</span>
+      <input type="text" name="q" value="{{ search_query or '' }}" placeholder="{{ t('ideas.search_placeholder') }}"
+             style="border:none; padding:0.5rem 0.5rem; flex:1; margin:0; font-size:1rem;">
+    </div>
+  </div>
   <div>
     <label>{{ t('ideas.filter_technology') }}</label>
     <select name="technology" onchange="this.form.submit()">
@@ -22,7 +30,8 @@
       {% endfor %}
     </select>
   </div>
-  {% if filter_technology or filter_material %}
+  <button type="submit" class="secondary">{{ t('ideas.search_btn') }}</button>
+  {% if filter_technology or filter_material or search_query %}
     <a class="btn secondary" href="{{ url_for('list_projects') }}">{{ t('ideas.clear_filters') }}</a>
   {% endif %}
 </form>
@@ -63,6 +72,6 @@
     {% endif %}
   </div>
 {% else %}
-  <p class="muted">{{ t('ideas.none_yet', suffix=(t('ideas.matching_filters') if filter_technology or filter_material else '')) }}</p>
+  <p class="muted">{{ t('ideas.none_yet', suffix=(t('ideas.matching_filters') if filter_technology or filter_material or search_query else '')) }}</p>
 {% endfor %}
 {% endblock %}
