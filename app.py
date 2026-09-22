@@ -192,7 +192,7 @@ def home():
                 JOIN reviews r ON r.target_type = 'project' AND r.target_id = p.id
                 GROUP BY p.id, pe.name, pe.picture
                 ORDER BY avg_rating DESC, review_count DESC
-                LIMIT 6
+                LIMIT 12
                 """
             )
             top_ideas = cur.fetchall()
